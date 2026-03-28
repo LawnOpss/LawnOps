@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+ <meta charset="UTF-8" />
+ <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+ <title>Daily Route Sheet – TDA Compliant</title>
+ <style>
+    @media print {
+      body { margin: 0.5in; }
+      .print-button { display: none !important; }
+    }
+    
+    body {
+      margin: 0.75in;
+      font-family: 'Georgia', 'Times New Roman', Times, serif;
+      font-size: 12pt;
+      line-height: 1.3;
+      color: #000;
+      background: white;
+    }
+    
+    .header {
+      text-align: center;
+      margin-bottom: 0.4in;
+      padding-bottom: 0.25in;
+      border-bottom: 3px double #000;
+    }
+    
+    .header h1 {
+      font-size: 22pt;
+      font-weight: bold;
+      margin: 0 0 0.1in 0;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    
+    .header-info {
+      font-size: 11pt;
+      margin: 0.1in 0 0 0;
+    }
+    
+    .customer-section {
+      margin-bottom: 0.6in;
+      padding: 0.3in;
+      border: 2px solid #000;
+      page-break-inside: avoid;
+    }
+    
+    .customer-header {
+      font-size: 16pt;
+      font-weight: bold;
+      border-bottom: 2px solid #000;
+      padding-bottom: 0.1in;
+      margin-bottom: 0.15in;
+    }
+    
+    .customer-details {
+      margin-bottom: 0.25in;
+      font-size: 12pt;
+      line-height: 1.2;
+    }
+    
+    .chemical-section {
+      margin-bottom: 0.25in;
+    }
+    
+    .chemical-label {
+      font-weight: bold;
+      margin-bottom: 0.08in;
+      font-size: 11pt;
+    }
+    
+    .chemical-line {
+      border-bottom: 1px solid #000;
+      height: 0.25in;
+      margin-bottom: 0.1in;
+      position: relative;
+    }
+    
+    .notes-section {
+      margin-top: 0.2in;
+      border: 1px solid #000;
+      height: 1.8in;
+      padding: 0.15in;
+      font-size: 11pt;
+    }
+    
+    .signature-line {
+      margin-top: 0.25in;
+      padding-top: 0.15in;
+      border-top: 1px solid #000;
+      font-size: 11pt;
+    }
+    
+    .route-summary {
+      margin-top: 0.4in;
+      padding: 0.3in;
+      border: 3px double #000;
+      background: #f9f9f9;
+      page-break-inside: avoid;
+    }
+    
+    .summary-header {
+      text-align: center;
+      font-size: 16pt;
+      font-weight: bold;
+      margin-bottom: 0.2in;
+      text-transform: uppercase;
+    }
+    
+    .summary-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.2in;
+      font-size: 14pt;
+    }
+    
+    .summary-item {
+      border: 1px solid #000;
+      padding: 0.2in;
+      text-align: center;
+    }
+    
+    .summary-number {
+      font-size: 20pt;
+      font-weight: bold;
+      margin-bottom: 0.05in;
+    }
+    
+    .print-controls {
+      text-align: center;
+      margin: 0.5in 0;
+      display: block;
+    }
+    
+    .print-btn {
+      display: inline-block;
+      padding: 0.4in 0.8in;
+      font-size: 16pt;
+      background: #10b981;
+      color: white;
+      text-decoration: none;
+      border-radius: 8px;
+      font-weight: bold;
+      margin-top: 0.2in;
+    }
+ </style>
+</head>
+<body>
+  <div class="header">
+    <h1>DAILY ROUTE SHEET<br>TDA COMPLIANT RECORD</h1>
+    <div class="header-info">
+      Date: <span id="printDate"></span> | Time Printed: <span id="printTime"></span>
+    </div>
+  </div>
+
+  <div id="route-list">
+    <p style="text-align:center;padding:2in;font-style:italic;">LOADING ROUTE...</p>
+  </div>
+
+  <div id="route-summary" style="display:none;" class="route-summary">
+    <div class="summary-header">PRODUCTION SUMMARY</div>
+    <div class="summary-grid">
+      <div class="summary-item">
+        <div class="summary-number" id="totalSqft">-</div>
+        <div>Total Sq Ft</div>
+      </div>
+      <div class="summary-item">
+        <div class="summary-number" id="revenueRange">$-$-</div>
+        <div>TOTAL REVENUE</div>
+      </div>
+      <div class="summary-item">
+        <div class="summary-number" id="customersCount">-</div>
+        <div>Customers</div>
+      </div>
+      <div class="summary-item">
+        <div class="summary-number" id="avgPrice">$-</div>
+        <div>Avg Per Service</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="print-controls">
+    <a href="#" class="print-btn" onclick="window.print();return false;">
+      🖨️ PRINT ROUTE SHEET
+    </a>
+  </div>
+
+  <script>
+    let routeData = [];
+    
+    document.getElementById('printDate').textContent = new Date().toLocaleDateString('en-US', {
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+    });
+    document.getElementById('printTime').textContent = new Date().toLocaleTimeString('en-US');
+
+    async function loadRoute() {
+      try {
+        const res = await fetch("/current_route");
+        if (!res.ok) throw new Error('No route data');
+        
+        const json = await res.json();
+        routeData = json.route || [];
+        
+        if (routeData.length === 0) {
+          document.getElementById('route-list').innerHTML = 
+            "<p style='text-align:center;padding:2in;font-style:italic;'>NO CUSTOMERS SELECTED</p>";
+          return;
+        }
+        
+        renderRoute();
+        
+      } catch (err) {
+        document.getElementById('route-list').innerHTML = 
+          "<p style='text-align:center;padding:2in;'>ERROR LOADING ROUTE</p>";
+      }
+    }
+    
+    function renderRoute() {
+      let html = '';
+      
+      routeData.forEach((c, i) => {
+        html += `
+        <div class="customer-section">
+          <div class="customer-header">
+            ${i+1}. ${c.name.toUpperCase()}
+          </div>
+          
+          <div class="customer-details">
+            ${c.address}<br>
+            Phone: ${c.phone || 'N/A'} | ${c.sqft.toLocaleString()} SQ FT
+          </div>
+          
+          <div class="chemical-section">
+            <div class="chemical-label">HERBICIDE:</div>
+            <div class="chemical-line"></div>
+            <div class="chemical-label">INSECTICIDE:</div>
+            <div class="chemical-line"></div>
+            <div class="chemical-label">FERTILIZER:</div>
+            <div class="chemical-line"></div>
+            <div class="chemical-label">OTHER:</div>
+            <div class="chemical-line"></div>
+          </div>
+          
+          <div class="notes-section">
+            NOTES:
+          </div>
+          
+          <div class="signature-line">
+            Tech: ______ Time In: ______ Time Out: ______ Wind: ______ mph
+          </div>
+        </div>
+        `;
+      });
+      
+      document.getElementById('route-list').innerHTML = html;
+      renderSummary();
+    }
+    
+    function renderSummary() {
+  const totalSqft = routeData.reduce((sum, c) => sum + c.sqft, 0);
+  const totalActual = routeData.reduce((sum, c) => sum + (c.actual_price || (c.sqft * 0.01)), 0);
+  
+  document.getElementById('totalSqft').textContent = totalSqft.toLocaleString();
+  document.getElementById('revenueRange').textContent = `$${totalActual.toFixed(0)}`;
+  document.getElementById('customersCount').textContent = routeData.length;
+  document.getElementById('avgPrice').textContent = `$${Math.round(totalActual/routeData.length)}`;
+  
+  document.getElementById('route-summary').style.display = 'block';
+}
+    
+    loadRoute();
+  </script>
+</body>
+</html>

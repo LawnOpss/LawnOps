@@ -1,0 +1,8 @@
+database.db
+*.db
+__pycache__/
+*.pyc
+.env
+.venv/
+node_modules/
+*.log

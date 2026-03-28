@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lawn Care CRM</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1d4ed8;
+            --primary-light: #dbeafe;
+            --secondary: #64748b;
+            --accent: #0f172a;
+            --light: #f8fafc;
+            --dark: #1e293b;
+            --white: #ffffff;
+            --gray-50: #f8fafc;
+            --gray-100: #f1f5f9;
+            --gray-200: #e2e8f0;
+            --gray-300: #cbd5e1;
+            --gray-400: #94a3b8;
+            --gray-500: #64748b;
+            --gray-600: #475569;
+            --gray-700: #334155;
+            --gray-800: #1e293b;
+            --gray-900: #0f172a;
+            --success: #16a34a;
+            --warning: #ea580c;
+            --danger: #dc2626;
+            --bg: #f8fafc;
+            --surface: #ffffff;
+            --border: #e2e8f0;
+            --text-primary: #0f172a;
+            --text-secondary: #475569;
+            --text-tertiary: #94a3b8;
+            --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f9fafb;
+            min-height: 100vh;
+            color: var(--dark);
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+            min-height: 100vh;
+        }
+
+        .header {
+            background: var(--white);
+            padding: 2rem;
+            border-radius: 20px;
+            box-shadow: var(--shadow-lg);
+            margin-bottom: 2rem;
+            text-align: center;
+            border: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+        }
+
+        .header p {
+            color: var(--secondary);
+            font-size: 1.1rem;
+            font-weight: 500;
+        }
+
+        .content-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        @media (max-width: 1024px) {
+            .content-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: var(--white);
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: var(--shadow-lg);
+            border: 1px solid rgba(0, 0, 0, 0.05);
+            transition: all 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        }
+
+        .form-card h3,
+        .customers-card h3 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--dark);
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            color: var(--dark);
+            margin-bottom: 0.5rem;
+            font-size: 0.95rem;
+        }
+
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 0.875rem 1rem;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            font-size: 1rem;
+            transition: all 0.2s ease;
+            font-family: inherit;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 100px;
+            font-family: inherit;
+        }
+
+        .btn {
+            padding: 0.875rem 2rem;
+            border: none;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            text-decoration: none;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(16, 185, 129, 0.3);
+        }
+
+        .search-container {
+            margin-bottom: 2rem;
+        }
+
+        #search {
+            width: 100%;
+            padding: 1rem 1.5rem;
+            border: 2px solid #e2e8f0;
+            border-radius: 50px;
+            font-size: 1rem;
+            background: var(--white);
+            box-shadow: var(--shadow);
+            transition: all 0.2s ease;
+        }
+
+        #search:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+        }
+
+        .customers-list {
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+
+        .customer-item {
+            background: var(--white);
+            border-radius: 16px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            box-shadow: var(--shadow);
+            border: 1px solid rgba(0, 0, 0, 0.05);
+            transition: all 0.2s ease;
+        }
+
+        .customer-item:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .customer-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .customer-name {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--dark);
+        }
+
+        .customer-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            font-size: 0.95rem;
+            color: var(--secondary);
+        }
+
+        .customer-meta span {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .price-range {
+            font-weight: 600;
+            color: var(--primary);
+            font-size: 1.1rem;
+        }
+
+        .notes-section {
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        .notes-display {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 1rem;
+            min-height: 60px;
+            font-style: italic;
+            color: var(--secondary);
+            margin-bottom: 0.5rem;
+        }
+
+        .notes-input {
+            width: 100%;
+            height: 80px;
+            resize: vertical;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 1rem;
+            font-family: inherit;
+            font-size: 0.95rem;
+            display: none;
+        }
+
+        .notes-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+        }
+
+        .notes-buttons {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .btn-small {
+            padding: 0.5rem 1rem;
+            font-size: 0.875rem;
+        }
+
+        .btn-edit {
+            background: #3b82f6;
+            color: white;
+        }
+
+        .btn-save {
+            background: var(--success);
+            color: white;
+        }
+
+        .btn-cancel {
+            background: #6b7280;
+            color: white;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem 2rem;
+            color: var(--secondary);
+        }
+
+        .empty-state i {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: var(--white);
+            padding: 1.5rem;
+            border-radius: 16px;
+            text-align: center;
+            box-shadow: var(--shadow);
+            border: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: 800;
+            color: var(--primary);
+            margin-bottom: 0.25rem;
+        }
+
+        /* Hamburger menu */
+        .hamburger-menu {
+            position: fixed;
+            top: 1rem;
+            left: 1rem;
+            z-index: 1000;
+        }
+
+        .hamburger-btn {
+            background: transparent;
+            border: none;
+            font-size: 1.5rem;
+            color: var(--primary);
+            cursor: pointer;
+            padding: 0.5rem;
+            border-radius: 8px;
+            transition: background 0.2s ease;
+        }
+
+        .hamburger-btn:hover {
+            background: #f1f5f9;
+        }
+
+        .hamburger-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            width: 180px;
+            background: var(--white);
+            border-radius: 12px;
+            box-shadow: var(--shadow-lg);
+            padding: 0.5rem 0;
+            margin: 0;
+            list-style: none;
+            display: none;
+            border: 1px solid #e2e8f0;
+        }
+
+        .hamburger-dropdown.visible {
+            display: block;
+        }
+
+        .hamburger-dropdown li a {
+            display: block;
+            padding: 0.75rem 1rem;
+            text-decoration: none;
+            color: var(--dark);
+            transition: background 0.2s ease;
+        }
+
+        .hamburger-dropdown li a:hover {
+            background: #f1f5f9;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+
+            .header h1 {
+                font-size: 2rem;
+            }
+
+            .customer-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <nav style="position: sticky; top: 0; background: white; z-index: 100; padding: 1rem 0; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05); margin-bottom: 1.5rem;">
+        <div style="max-width: 1400px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; padding: 0 2rem;">
+            <div style="display: flex; align-items: center; gap: 2rem;">
+                <a href="/" style="text-decoration: none; color: inherit; font-size: 1.5rem; font-weight: 800; color: var(--primary);"><i class="fas fa-leaf"></i> LawnOps</a>
+                <div style="display: flex; gap: 2rem; font-size: 1rem;">
+                    <a href="/" style="text-decoration: none; color: inherit; display: flex; align-items: center; gap: 0.5rem;"><i class="fas fa-home" style="color: var(--primary);"></i> Dashboard</a>
+                    <a href="/routing.html" style="text-decoration: none; color: inherit; display: flex; align-items: center; gap: 0.5rem;"><i class="fas fa-route" style="color: var(--primary);"></i> Routing</a>
+                    <a href="/analytics" style="text-decoration: none; color: inherit; display: flex; align-items: center; gap: 0.5rem;"><i class="fas fa-chart-line" style="color: var(--primary);"></i> Analytics</a>
+                </div>
+            </div>
+            <div style="display: flex; gap: 1rem; align-items: center; font-size: 0.9rem; color: var(--secondary);">
+                <button class="btn btn-primary" onclick="fetchCustomers()" style="padding: 0.5rem 1rem; font-size: 0.875rem;">
+                    <i class="fas fa-sync-alt"></i> Refresh
+                </button>
+                <span id="lastSync" style="opacity: 0.7;">Live</span>
+
+            .notes-input {
+                width: 100%;
+                height: 80px;
+                resize: vertical;
+                border: 2px solid #e2e8f0;
+                border-radius: 12px;
+                padding: 1rem;
+                font-family: inherit;
+                font-size: 0.95rem;
+                display: none;
+            }
+                <div>⚠️ Due Today</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="totalCustomers">0</div>
+                <div>Total Customers</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number avg-price">$0</div>
+                <div>Avg Cost Per Service</div>
+            </div>
+        </div>
+
+        <div class="content-grid">
+            <div class="card form-card">
+                <h3><i class="fas fa-plus-circle"></i> Add New Customer</h3>
+                <form id="customerForm">
+                    <div class="form-group">
+                        <label><i class="fas fa-user"></i> Customer Name</label>
+                        <input type="text" id="name" required placeholder="John Smith">
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-map-marker-alt"></i> Address</label>
+                        <input type="text" id="address" required placeholder="123 Green St">
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-phone"></i> Phone</label>
+                        <input type="tel" id="phone" required placeholder="(555) 123-4567">
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-ruler-combined"></i> Square Footage</label>
+                        <input type="number" id="sqft" required placeholder="2500" min="1">
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-sticky-note"></i> Notes</label>
+                        <textarea id="notes" placeholder="Gate code, dog friendly, etc..."></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> Add Customer
+                    </button>
+                </form>
+            </div>
+
+            <div class="card customers-card">
+                <h3><i class="fas fa-ruler-combined"></i> Measure Property</h3>
+
+                <div class="map-container">
+                    <iframe src="https://www.mapdevelopers.com/area_finder.php" width="100%" height="500"
+                        frameborder="0" style="display: block; overflow: hidden;">
+                    </iframe>
+                </div>
+            </div>
+
+            <!-- Moved customer list down here -->
+            <div class="card">
+                <div class="search-container">
+                    <input type="text" id="search" placeholder="🔍 Search customers by name, address, or phone...">
+                </div>
+                <h3><i class="fas fa-list"></i> All Customers (<span id="customerCount">0</span>)</h3>
+                <div class="customers-list" id="customerList">
+                    <div class="empty-state">
+                        <i class="fas fa-users"></i>
+                        <h3>No customers yet</h3>
+                        <p>Add your first customer using the form above</p>
+                    </div>
+                </div>
+            </div>
+
+            <script>
+                let editingElements = new Set();
+                let customerData = [];
+
+                const list = document.getElementById("customerList");
+                const searchInput = document.getElementById("search");
+                const customerCount = document.getElementById("customerCount");
+                const totalCustomersEl = document.getElementById("totalCustomers");
+                const avgPriceEl = document.querySelector(".avg-price");
+
+                async function fetchCustomers() {
+                    try {
+                        const res = await fetch("/customers");
+                        if (!res.ok) throw new Error("API error: " + res.status);
+                        const data = await res.json();
+                        customerData = data.customers;
+
+                        if (editingElements.size === 0) {
+                            renderCustomers();
+                            updateStats();
+                        }
+                    } catch (e) {
+                        console.error("Fetch error:", e);
+                        if (editingElements.size === 0) {
+                            list.innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><h3>Error loading customers</h3></div>';
+                        }
+                    }
+                }
+
+                function updateStats() {
+                    const total = customerData.length;
+                    const avgPrice = total > 0 ? customerData.reduce((sum, c) => sum + (c[5] + c[4]) / 2, 0) / total : 0;
+
+                    customerCount.textContent = total;
+                    totalCustomersEl.textContent = total;
+                    avgPriceEl.textContent = "$" + avgPrice.toFixed(0);
+                }
+
+                function renderCustomers() {
+                    const query = searchInput.value.toLowerCase();
+                    list.innerHTML = "";
+
+                    console.log("customerData =", customerData);
+
+                    if (!customerData || customerData.length === 0) {
+                        list.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-users"></i>
+                        <h3>No customers found</h3>
+                        <p>${query ? "Try adjusting your search" : "Add your first customer above"}</p>
+                    </div>
+                `;
+                        return;
+                    }
+
+                    const filtered = customerData
+                        .filter(
+                            c =>
+                                c[0]?.toLowerCase().includes(query) ||
+                                c[1]?.toLowerCase().includes(query) ||
+                                c[2]?.toLowerCase().includes(query)
+                        )
+                        .reverse();
+
+                    filtered.forEach((c, index) => {
+                        console.log("ROWID:", c[9], "c[7] =", c[7], "type =", typeof c[7]);
+                        const rowid = c[9];
+                        const isEditing = editingElements.has(rowid);
+
+                        list.innerHTML += `
+    <div class="customer-item">
+        <div class="customer-header">
+            <div class="customer-name">${c[0]}</div>
+            <div class="customer-meta">
+                <span><i class="fas fa-map-marker-alt"></i> ${c[1]}</span>
+                <span><i class="fas fa-phone"></i> ${c[2]}</span>
+                <span><i class="fas fa-ruler-combined"></i> ${c[3].toLocaleString()} sqft</span>
+                <span style="padding: 0.3rem 0.8rem; border-radius: 20px; font-size: 0.8rem; font-weight: 600; 
+                    ${c[8] === 'due' ? 'background: #fef2f2; color: #dc2626; border: 1px solid #fecaca;' : 'background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0;'}">
+                    ${c[8] === 'due' ? '🚨 DUE NOW' : '✅ CURRENT'}
+                </span>
+                ${c[12] ? '' : '<span class="price-range"><i class="fas fa-dollar-sign"></i> $' + c[4].toFixed(0) + ' - $' + c[5].toFixed(0) + '/service</span>'}
+                ${c[12] ? `<br><span style="color: var(--primary); font-weight: 600;"><i class="fas fa-check-circle"></i> Actual: $${c[12].toFixed(0)}</span>` : ''}
+                <div style="margin-top: 0.5rem; padding: 0.5rem; background: #f8fafc; border-radius: 8px; border: 1px solid #e5e7eb;">
+                    <label style="font-size: 0.85rem; color: #6b7280; display: block; margin-bottom: 0.25rem;">Actual Price:</label>
+                    <input type="number" step="0.01" min="0" id="price-${rowid}" style="width:100px;padding:0.4rem;border:1px solid #d1d5db;border-radius:6px;" value="${c[12] || ''}" placeholder="$0.00">
+                    <button onclick="confirmPrice(${rowid})" style="margin-left:0.5rem;padding:0.4rem 0.8rem;background:var(--primary);color:var(--white);border:none;border-radius:6px;font-size:0.8rem;cursor:pointer;transition:all 0.2s ease;">Confirm</button>
+                </div>
+                <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
+                    ${(() => {
+                                const raw = c[7];
+                                if (!raw || raw === "null" || raw === "None" || raw === "" || raw === "0") {
+                                    return `
+                            <button class="btn btn-small" style="background:var(--primary);color:var(--white);border:none;transition:all 0.2s ease;" onclick="markService(${rowid}, this)">
+                                <i class="fas fa-check-circle"></i> Mark Serviced
+                            </button>
+                            `;
+                                }
+                                try {
+                                    const d = new Date(raw);
+                                    if (isNaN(d.getTime())) throw new Error();
+                                    const dueAgain = new Date(d.getTime() + 45 * 86400000);
+                                    return `
+                            <div style="padding:0.5rem;background:var(--primary);border-radius:8px;margin-top:0.5rem;font-size:0.8rem;color:var(--white);">
+                                <strong><i class="fas fa-check-circle"></i> Completed: ${d.toLocaleDateString()}</strong><br>
+                                <small>Due again: ${dueAgain.toLocaleDateString()}</small>
+                            </div>
+                            `;
+                                } catch (e) {
+                                    return `
+                            <button class="btn btn-small" style="background:var(--primary);color:var(--white);border:none;transition:all 0.2s ease;" onclick="markService(${rowid}, this)">
+                                <i class="fas fa-check-circle"></i> Mark Serviced
+                            </button>
+                            `;
+                                }
+                            })()}
+                    <button class="btn btn-small btn-danger" onclick="deleteCustomer(${rowid})" style="background: #ef4444; border: none;">
+                        <i class="fas fa-trash"></i> Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div class="notes-section">
+            <strong><i class="fas fa-sticky-note"></i> Notes</strong>
+            <div class="notes-display" data-rowid="${rowid}">
+                ${c[6] || "No notes yet - click Edit to add"}
+            </div>
+            <textarea class="notes-input" data-rowid="${rowid}" 
+                style="display: ${isEditing ? "block" : "none"};">${c[6] || ""}</textarea>
+            <div class="notes-buttons">
+                <button class="btn btn-small btn-edit" onclick="toggleEdit(${rowid})">
+                    <i class="fas fa-edit"></i> ${isEditing ? "Cancel" : "Edit Notes"}
+                </button>
+                ${isEditing ? `<button class="btn btn-small btn-save" onclick="saveNotes(${rowid})">
+                    <i class="fas fa-save"></i> Save Notes
+                </button>` : ""}
+            </div>
+        </div>
+    </div>
+`;
+                    });
+                }
+                function toggleEdit(rowid) {
+                    if (editingElements.has(rowid)) {
+                        editingElements.delete(rowid);
+                    } else {
+                        editingElements.clear();
+                        editingElements.add(rowid);
+                    }
+                    renderCustomers();
+                }
+
+                function saveNotes(rowid) {
+                    const textarea = document.querySelector(`textarea[data-rowid="${rowid}"]`);
+                    if (!textarea) return;
+                    const newNotes = textarea.value;
+
+                    fetch("/update_notes", {
+                        method: "POST",
+                        body: new URLSearchParams({ rowid: rowid.toString(), notes: newNotes })
+                    })
+                        .then(res => {
+                            if (res.ok) {
+                                editingElements.delete(rowid);
+                                fetchCustomers();
+                            } else {
+                                alert("Save failed. Try again.");
+                            }
+                        })
+                        .catch(e => {
+                            console.error("Save error:", e);
+                            alert("Save failed. Try again.");
+                        });
+                }
+
+                function deleteCustomer(rowid) {
+                    if (!confirm("Delete this customer? This cannot be undone.")) {
+                        return;
+                    }
+
+                    fetch("/delete_customer", {
+                        method: "POST",
+                        body: new URLSearchParams({ rowid: rowid.toString() })
+                    })
+                        .then(res => {
+                            if (res.ok) {
+                                fetchCustomers();
+                            } else {
+                                alert("Delete failed. Try again.");
+                            }
+                        })
+                        .catch(e => {
+                            console.error("Delete error:", e);
+                            alert("Delete failed. Try again.");
+                        });
+                }
+
+                function confirmPrice(rowid) {
+                    const input = document.getElementById(`price-${rowid}`);
+                    const price = parseFloat(input.value);
+
+                    if (!price || price <= 0) {
+                        alert("Enter a valid price");
+                        return;
+                    }
+
+                    fetch("/update_actual_price", {
+                        method: "POST",
+                        body: new URLSearchParams({ rowid: rowid.toString(), actual_price: price })
+                    })
+                        .then(res => {
+                            if (res.ok) {
+                                input.style.borderColor = "var(--primary)";
+                                setTimeout(() => fetchCustomers(), 800);
+                            } else {
+                                alert("Save failed. Try again.");
+                            }
+                        })
+                        .catch(e => {
+                            console.error("Save error:", e);
+                            alert("Save failed. Try again.");
+                        });
+                }
+
+                document.getElementById("customerForm").addEventListener("submit", async (e) => {
+                    e.preventDefault();
+                    const name = document.getElementById("name").value;
+                    const address = document.getElementById("address").value;
+                    const phone = document.getElementById("phone").value;
+                    const sqft = parseInt(document.getElementById("sqft").value);
+                    const notes = document.getElementById("notes").value;
+                    const service_min = sqft * 0.008;
+                    const service_max = sqft * 0.012;
+
+                    try {
+                        const res = await fetch("/add_customer", {
+                            method: "POST",
+                            body: new URLSearchParams({ name, address, phone, sqft, monthly_min: service_min, monthly_max: service_max, notes })
+                        });
+                        if (res.ok) {
+                            document.getElementById("customerForm").reset();
+                            fetchCustomers();
+                        } else {
+                            alert("Failed to add customer.");
+                        }
+                    } catch (e) {
+                        console.error("Add error:", e);
+                        alert("Failed to add customer");
+                    }
+                });
+
+                searchInput.addEventListener("input", () => {
+                    if (editingElements.size === 0) {
+                        renderCustomers();
+                    }
+                });
+
+                setInterval(() => {
+                    if (editingElements.size === 0 && document.activeElement.tagName !== 'INPUT') {
+                        fetchCustomers();
+                    }
+                }, 5000);
+
+
+                fetchCustomers();
+
+                function markService(rowid, button) {
+                    button.style.opacity = '0.7';
+                    fetch("/mark_service", {
+                        method: "POST",
+                        body: new URLSearchParams({ rowid: rowid.toString() })
+                    })
+                        .then(res => {
+                            if (res.ok) {
+                                setTimeout(() => {
+                                    fetchCustomers();
+                                }, 1000);
+                            } else {
+                                alert("Failed to mark service.");
+                            }
+                        })
+                        .catch(err => {
+                            alert("Failed: " + err);
+                        });
+                }
+
+                // Hamburger menu (fixed click‑timing)
+                const hamburgerBtn = document.querySelector(".hamburger-btn");
+                const hamburgerDropdown = document.querySelector(".hamburger-dropdown");
+
+                if (hamburgerBtn && hamburgerDropdown) {
+                    // Toggle the dropdown on hamburger click
+                    hamburgerBtn.addEventListener("click", (e) => {
+                        e.preventDefault();
+                        e.stopPropagation(); // ← this stops the “clicked outside” handler from firing immediately
+                        hamburgerDropdown.classList.toggle("visible");
+                    });
+
+                    // Close dropdown when clicking outside
+                    document.addEventListener("click", (e) => {
+                        if (
+                            hamburgerDropdown.classList.contains("visible") &&
+                            !hamburgerDropdown.contains(e.target) &&
+                            e.target !== hamburgerBtn
+                        ) {
+                            hamburgerDropdown.classList.remove("visible");
+                        }
+                    });
+
+                    // Close dropdown when pressing Escape
+                    document.addEventListener("keydown", (e) => {
+                        if (e.key === "Escape" && hamburgerDropdown.classList.contains("visible")) {
+                            hamburgerDropdown.classList.remove("visible");
+                        }
+                    });
+                }
+            </script>

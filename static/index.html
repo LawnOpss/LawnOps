@@ -1,0 +1,1358 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lawn Care CRM</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1d4ed8;
+            --primary-light: #dbeafe;
+            --secondary: #64748b;
+            --accent: #0f172a;
+            --light: #f8fafc;
+            --dark: #1e293b;
+            --white: #ffffff;
+            --gray-50: #f8fafc;
+            --gray-100: #f1f5f9;
+            --gray-200: #e2e8f0;
+            --gray-300: #cbd5e1;
+            --gray-400: #94a3b8;
+            --gray-500: #64748b;
+            --gray-600: #475569;
+            --gray-700: #334155;
+            --gray-800: #1e293b;
+            --gray-900: #0f172a;
+            --success: #16a34a;
+            --warning: #ea580c;
+            --danger: #dc2626;
+            --bg: #f8fafc;
+            --surface: #ffffff;
+            --border: #e2e8f0;
+            --text-primary: #0f172a;
+            --text-secondary: #475569;
+            --text-tertiary: #94a3b8;
+            --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f9fafb;
+            min-height: 100vh;
+            color: var(--dark);
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+            min-height: 100vh;
+        }
+
+        .header {
+            background: var(--white);
+            padding: 2rem;
+            border-radius: 20px;
+            box-shadow: var(--shadow-lg);
+            margin-bottom: 2rem;
+            text-align: center;
+            border: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+        }
+
+        .header p {
+            color: var(--secondary);
+            font-size: 1.1rem;
+            font-weight: 500;
+        }
+
+        .content-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        @media (max-width: 1024px) {
+            .content-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: var(--white);
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: var(--shadow-lg);
+            border: 1px solid rgba(0, 0, 0, 0.05);
+            transition: all 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        }
+
+        .form-card h3,
+        .customers-card h3 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--dark);
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            color: var(--dark);
+            margin-bottom: 0.5rem;
+            font-size: 0.95rem;
+        }
+
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 0.875rem 1rem;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            font-size: 1rem;
+            transition: all 0.2s ease;
+            font-family: inherit;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 100px;
+            font-family: inherit;
+        }
+
+        .btn {
+            padding: 0.875rem 2rem;
+            border: none;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            text-decoration: none;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(37, 99, 235, 0.3);
+        }
+
+        .search-container {
+            margin-bottom: 2rem;
+        }
+
+        #search {
+            width: 100%;
+            padding: 1rem 1.5rem;
+            border: 2px solid #e2e8f0;
+            border-radius: 50px;
+            font-size: 1rem;
+            background: var(--white);
+            box-shadow: var(--shadow);
+            transition: all 0.2s ease;
+        }
+
+        #search:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .customers-list {
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+
+        .customer-item {
+            background: var(--white);
+            border-radius: 16px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            box-shadow: var(--shadow);
+            border: 1px solid rgba(0, 0, 0, 0.05);
+            transition: all 0.2s ease;
+        }
+
+        .customer-item:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .customer-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .customer-name {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--dark);
+        }
+
+        .customer-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            font-size: 0.95rem;
+            color: var(--secondary);
+        }
+
+        .customer-meta span {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .price-range {
+            font-weight: 600;
+            color: var(--primary);
+            font-size: 1.1rem;
+        }
+
+        .notes-section {
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        .notes-display {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 1rem;
+            min-height: 60px;
+            font-style: italic;
+            color: var(--secondary);
+            margin-bottom: 0.5rem;
+        }
+
+        .notes-input {
+            width: 100%;
+            height: 80px;
+            resize: vertical;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 1rem;
+            font-family: inherit;
+            font-size: 0.95rem;
+            display: none;
+        }
+
+        .notes-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .notes-buttons {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .btn-small {
+            padding: 0.5rem 1rem;
+            font-size: 0.875rem;
+        }
+
+        .btn-edit {
+            background: #3b82f6;
+            color: white;
+        }
+
+        .btn-save {
+            background: var(--success);
+            color: white;
+        }
+
+        .btn-cancel {
+            background: #6b7280;
+            color: white;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem 2rem;
+            color: var(--secondary);
+        }
+
+        .empty-state i {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: var(--white);
+            padding: 1.5rem;
+            border-radius: 16px;
+            text-align: center;
+            box-shadow: var(--shadow);
+            border: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: 800;
+            color: var(--primary);
+            margin-bottom: 0.25rem;
+        }
+    </style>
+</head>
+
+<body>
+    <nav style="position: sticky; top: 0; background: white; z-index: 100; padding: 1rem 0; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05); margin-bottom: 1.5rem;">
+        <div style="max-width: 1400px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; padding: 0 2rem;">
+            <div style="display: flex; align-items: center; gap: 2rem;">
+                <a href="/" style="text-decoration: none; color: inherit; font-size: 1.5rem; font-weight: 800; color: var(--primary);"><i class="fas fa-leaf"></i> LawnOps</a>
+                <div style="display: flex; gap: 2rem; font-size: 1rem;">
+                    <a href="/" style="text-decoration: none; color: inherit; display: flex; align-items: center; gap: 0.5rem;"><i class="fas fa-home" style="color: var(--primary);"></i> Dashboard</a>
+                    <a href="/routing.html" style="text-decoration: none; color: inherit; display: flex; align-items: center; gap: 0.5rem;"><i class="fas fa-route" style="color: var(--primary);"></i> Routing</a>
+                    <a href="/analytics" style="text-decoration: none; color: inherit; display: flex; align-items: center; gap: 0.5rem;"><i class="fas fa-chart-line" style="color: var(--primary);"></i> Analytics</a>
+                </div>
+            </div>
+            <div style="display: flex; gap: 1rem; align-items: center; font-size: 0.9rem; color: var(--secondary);">
+                <button class="btn btn-primary" onclick="fetchCustomers()" style="padding: 0.5rem 1rem; font-size: 0.875rem;">
+                    <i class="fas fa-sync-alt"></i> Refresh
+                </button>
+                <span id="lastSync" style="opacity: 0.7;">Live</span>
+                <a href="/owner" class="btn btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.875rem; background: var(--secondary); color: white;">Admin</a>
+            </div>
+        </div>
+    </nav>
+    <div class="container">
+        <div class="header">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <h1 style="font-size: 2rem; margin: 0; color: var(--dark);"><i class="fas fa-users"></i> Customer Management</h1>
+                    <p style="margin: 0.25rem 0 0 0; opacity: 0.9; font-size: 0.95rem; color: var(--gray-600);">Field Operations Dashboard v2.6.1</p>
+                </div>
+                <div id="statusIndicator" style="font-size: 0.85rem; opacity: 0.9;">
+                    <i class="fas fa-circle" style="color: #4ade80; font-size: 0.6rem;"></i> LIVE
+                </div>
+            </div>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card" style="border-left: 5px solid #ef4444;">
+                <div class="stat-number" id="dueToday" style="color: #ef4444;">0</div>
+                <div>⚠️ All Due Customers</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="totalCustomers">0</div>
+                <div>Total Customers</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="estRevenue">$0</div>
+                <div>Est. Revenue Potential</div>
+            </div>
+        </div>
+
+        <div class="content-grid">
+            <div class="card form-card">
+                <h3><i class="fas fa-plus-circle"></i> Add New Customer</h3>
+                <form id="customerForm">
+                    <div class="form-group">
+                        <label><i class="fas fa-user"></i> Customer Name</label>
+                        <input type="text" id="name" required placeholder="John Smith">
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-map-marker-alt"></i> Address</label>
+                        <input type="text" id="address" required placeholder="123 Green St">
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-phone"></i> Phone</label>
+                        <input type="tel" id="phone" required placeholder="(555) 123-4567">
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-ruler-combined"></i> Square Footage</label>
+                        <input type="number" id="sqft" required placeholder="2500" min="1">
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-sticky-note"></i> Notes</label>
+                        <textarea id="notes" placeholder="Gate code, dog friendly, etc..."></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> Add Customer
+                    </button>
+                </form>
+            </div>
+
+            <div class="card customers-card">
+                <h3><i class="fas fa-ruler-combined"></i> Property Measurement Tool</h3>
+                
+                <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
+                    <input type="text" id="measureAddress" placeholder="Enter address to search..." style="flex: 1; padding: 0.5rem; border: 1px solid var(--border); border-radius: 8px;">
+                    <button onclick="searchMeasureAddress()" class="btn btn-primary" style="padding: 0.5rem 1rem;"><i class="fas fa-search"></i> Search</button>
+                    <button onclick="removeLastPoint()" class="btn btn-secondary" style="padding: 0.5rem 1rem;" id="removePointBtn" disabled><i class="fas fa-undo"></i> Remove Last Point</button>
+                    <button onclick="clearMeasurements()" class="btn btn-secondary" style="padding: 0.5rem 1rem;"><i class="fas fa-trash"></i> Clear</button>
+                    <button onclick="saveCurrentMeasurement()" class="btn btn-success" style="padding: 0.5rem 1rem; display: none;" id="saveMeasurementBtn"><i class="fas fa-save"></i> Save to Customer</button>
+                </div>
+                
+                <div id="measurementMap" style="width: 100%; height: 400px; border-radius: 12px; border: 2px solid var(--border);"></div>
+                
+                <div style="display: flex; gap: 1rem; margin-top: 1rem; flex-wrap: wrap;">
+                    <div style="flex: 1; min-width: 150px; background: var(--gray-50); padding: 1rem; border-radius: 8px; text-align: center;">
+                        <div style="font-size: 1.5rem; font-weight: 700; color: var(--primary);" id="areaResult">0</div>
+                        <div style="font-size: 0.85rem; color: var(--gray-600);">Square Feet</div>
+                    </div>
+                    <div style="flex: 1; min-width: 150px; background: var(--gray-50); padding: 1rem; border-radius: 8px; text-align: center;">
+                        <div style="font-size: 1.5rem; font-weight: 700; color: var(--success);" id="acreResult">0</div>
+                        <div style="font-size: 0.85rem; color: var(--gray-600);">Acres</div>
+                    </div>
+                    <div style="flex: 1; min-width: 150px; background: var(--gray-50); padding: 1rem; border-radius: 8px; text-align: center;">
+                        <div style="font-size: 1.5rem; font-weight: 700; color: var(--warning);" id="quoteResult">$0 - $0</div>
+                        <div style="font-size: 0.85rem; color: var(--gray-600);">Est. Price Range</div>
+                    </div>
+                </div>
+                
+                <p style="margin-top: 0.75rem; font-size: 0.85rem; color: var(--gray-500);">
+                    <i class="fas fa-info-circle"></i> Click on the map to draw points. Double-click to complete the shape.
+                </p>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="search-container">
+                <input type="text" id="search" placeholder="🔍 Search customers by name, address, or phone...">
+            </div>
+            <h3><i class="fas fa-list"></i> All Customers (<span id="customerCount">0</span>)</h3>
+            <div class="customers-list" id="customerList">
+                <div class="empty-state">
+                    <i class="fas fa-users"></i>
+                    <h3>No customers yet</h3>
+                    <p>Add your first customer using the form above</p>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            let editingElements = new Set();
+            let customerData = [];
+
+            const list = document.getElementById("customerList");
+            const searchInput = document.getElementById("search");
+            const customerCount = document.getElementById("customerCount");
+            const totalCustomersEl = document.getElementById("totalCustomers");
+            const dueTodayEl = document.getElementById("dueToday");
+            const estRevenueEl = document.getElementById("estRevenue");
+
+            async function fetchCustomers() {
+                try {
+                    const res = await fetch("/customers");
+                    if (!res.ok) throw new Error("API error: " + res.status);
+                    const data = await res.json();
+                    customerData = data.customers;
+
+                    if (editingElements.size === 0) {
+                        renderCustomers();
+                        updateStats();
+                    }
+                } catch (e) {
+                    console.error("Fetch error:", e);
+                    if (editingElements.size === 0) {
+                        list.innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><h3>Error loading customers</h3></div>';
+                    }
+                }
+            }
+
+            function updateStats() {
+                const total = customerData.length;
+                const dueCount = customerData.filter(c => c[8] === 'due').length;
+                
+                // Calculate revenue from actual prices of due customers
+                const dueCustomers = customerData.filter(c => c[8] === 'due');
+                const actualRevenue = dueCustomers.reduce((sum, c) => sum + (c[12] || 0), 0);
+
+                customerCount.textContent = total;
+                totalCustomersEl.textContent = total;
+                dueTodayEl.textContent = dueCount;
+                estRevenueEl.textContent = "$" + actualRevenue.toFixed(0);
+            }
+
+            const CUSTOMERS_PER_PAGE = 50;
+            let currentPage = 1;
+            
+            function renderCustomers() {
+                const query = searchInput.value.toLowerCase();
+                const filtered = customerData.filter(c => 
+                    c[0].toLowerCase().includes(query) || 
+                    c[1].toLowerCase().includes(query)
+                );
+                
+                // Pagination
+                const start = (currentPage - 1) * CUSTOMERS_PER_PAGE;
+                const end = start + CUSTOMERS_PER_PAGE;
+                const pageCustomers = filtered.slice(start, end);
+                
+                // Separate into due and not due for display
+                const dueCustomers = pageCustomers.filter(c => c[8] === 'due');
+                const notDueCustomers = pageCustomers.filter(c => c[8] !== 'due');
+                list.innerHTML = "";
+
+                if (!customerData || customerData.length === 0) {
+                    list.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-users"></i>
+                        <h3>No customers found</h3>
+                        <p>${query ? "Try adjusting your search" : "Add your first customer above"}</p>
+                    </div>
+                `;
+                    return;
+                }
+
+                pageCustomers.forEach((c, index) => {
+                    const rowid = c[9];
+                    const isEditing = editingElements.has(rowid);
+
+                    list.innerHTML += `
+    <div class="customer-item">
+        <div class="customer-header">
+            <div class="customer-name">${c[0]}</div>
+            <div class="customer-meta">
+                <span><i class="fas fa-map-marker-alt"></i> ${c[1]}</span>
+                <span><i class="fas fa-phone"></i> ${c[2]}</span>
+                <span><i class="fas fa-ruler-combined"></i> ${c[3].toLocaleString()} sqft</span>
+                <span style="padding: 0.3rem 0.8rem; border-radius: 20px; font-size: 0.8rem; font-weight: 600; 
+                    ${c[8] === 'due' ? 'background: #fef2f2; color: #dc2626; border: 1px solid #fecaca;' : 'background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0;'}">
+                    ${c[8] === 'due' ? '🚨 DUE NOW' : '✅ CURRENT'}
+                </span>
+                ${c[12] ? '' : '<span class="price-range"><i class="fas fa-dollar-sign"></i> $' + c[4].toFixed(0) + ' - $' + c[5].toFixed(0) + '/service</span>'}
+                ${c[12] ? `<br><span style="color: var(--primary); font-weight: 600;"><i class="fas fa-check-circle"></i> Actual: $${c[12].toFixed(0)}</span>` : ''}
+                <div style="margin-top: 0.5rem; padding: 0.5rem; background: #f8fafc; border-radius: 8px; border: 1px solid #e5e7eb;">
+                    <label style="font-size: 0.85rem; color: #6b7280; display: block; margin-bottom: 0.25rem;">Actual Price:</label>
+                    <input type="number" step="0.01" min="0" id="price-${rowid}" style="width:100px;padding:0.4rem;border:1px solid #d1d5db;border-radius:6px;" value="${c[12] || ''}" placeholder="$0.00">
+                    <button onclick="confirmPrice(${rowid})" style="margin-left:0.5rem;padding:0.4rem 0.8rem;background:var(--primary);color:var(--white);border:none;border-radius:6px;font-size:0.8rem;cursor:pointer;transition:all 0.2s ease;">Confirm</button>
+                </div>
+                <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem; flex-wrap: wrap;">
+                    <button class="btn btn-small" style="background: var(--success); color: var(--white); border: none;" onclick="measureCustomer(${rowid}, '${c[1].replace(/'/g, "\\'")}')">
+                        <i class="fas fa-ruler-combined"></i> ${c[13] ? 'View Measurement' : 'Measure Property'}
+                    </button>
+                    ${(() => {
+                                const raw = c[7];
+                                if (!raw || raw === "null" || raw === "None" || raw === "" || raw === "0") {
+                                    return `
+                            <button class="btn btn-small" style="background:var(--primary);color:var(--white);border:none;transition:all 0.2s ease;" onclick="markService(${rowid}, this)">
+                                <i class="fas fa-check-circle"></i> Mark Serviced
+                            </button>
+                            `;
+                                }
+                                try {
+                                    const d = new Date(raw);
+                                    if (isNaN(d.getTime())) throw new Error();
+                                    const dueAgain = new Date(d.getTime() + 45 * 86400000);
+                                    return `
+                            <div style="padding:0.5rem;background:var(--primary);border-radius:8px;margin-top:0.5rem;font-size:0.8rem;color:var(--white);">
+                                <strong><i class="fas fa-check-circle"></i> Completed: ${d.toLocaleDateString()}</strong><br>
+                                <small>Due again: ${dueAgain.toLocaleDateString()}</small>
+                            </div>
+                            `;
+                                } catch (e) {
+                                    return `
+                            <button class="btn btn-small" style="background:var(--primary);color:var(--white);border:none;transition:all 0.2s ease;" onclick="markService(${rowid}, this)">
+                                <i class="fas fa-check-circle"></i> Mark Serviced
+                            </button>
+                            `;
+                                }
+                            })()}
+                    <button class="btn btn-small btn-danger" onclick="deleteCustomer(${rowid})" style="background: #ef4444; border: none;">
+                        <i class="fas fa-trash"></i> Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div class="notes-section">
+            <strong><i class="fas fa-sticky-note"></i> Notes</strong>
+            <div class="notes-display" data-rowid="${rowid}">
+                ${c[6] || "No notes yet - click Edit to add"}
+            </div>
+            <textarea class="notes-input" data-rowid="${rowid}" 
+                style="display: ${isEditing ? "block" : "none"};">${c[6] || ""}</textarea>
+            <div class="notes-buttons">
+                <button class="btn btn-small btn-edit" onclick="toggleEdit(${rowid})">
+                    <i class="fas fa-edit"></i> ${isEditing ? "Cancel" : "Edit Notes"}
+                </button>
+                ${isEditing ? `<button class="btn btn-small btn-save" onclick="saveNotes(${rowid})">
+                    <i class="fas fa-save"></i> Save Notes
+                </button>` : ""}
+            </div>
+        </div>
+    </div>
+`;
+                });
+            }
+            function toggleEdit(rowid) {
+                if (editingElements.has(rowid)) {
+                    editingElements.delete(rowid);
+                } else {
+                    editingElements.clear();
+                    editingElements.add(rowid);
+                }
+                renderCustomers();
+            }
+
+            function saveNotes(rowid) {
+                const textarea = document.querySelector(`textarea[data-rowid="${rowid}"]`);
+                if (!textarea) return;
+                const newNotes = textarea.value;
+
+                fetch("/update_notes", {
+                    method: "POST",
+                    body: new URLSearchParams({ rowid: rowid.toString(), notes: newNotes })
+                })
+                    .then(res => {
+                        if (res.ok) {
+                            editingElements.delete(rowid);
+                            fetchCustomers();
+                        } else {
+                            alert("Save failed. Try again.");
+                        }
+                    })
+                    .catch(e => {
+                        console.error("Save error:", e);
+                        alert("Save failed. Try again.");
+                    });
+            }
+
+            function deleteCustomer(rowid) {
+                if (!confirm("Delete this customer? This cannot be undone.")) {
+                    return;
+                }
+
+                fetch("/delete_customer", {
+                    method: "POST",
+                    body: new URLSearchParams({ rowid: rowid.toString() })
+                })
+                    .then(res => {
+                        if (res.ok) {
+                            fetchCustomers();
+                        } else {
+                            alert("Delete failed. Try again.");
+                        }
+                    })
+                    .catch(e => {
+                        console.error("Delete error:", e);
+                        alert("Delete failed. Try again.");
+                    });
+            }
+
+            function confirmPrice(rowid) {
+                const input = document.getElementById(`price-${rowid}`);
+                const price = parseFloat(input.value);
+
+                if (!price || price <= 0) {
+                    alert("Enter a valid price");
+                    return;
+                }
+
+                fetch("/update_actual_price", {
+                    method: "POST",
+                    body: new URLSearchParams({ rowid: rowid.toString(), actual_price: price })
+                })
+                    .then(res => {
+                        if (res.ok) {
+                            input.style.borderColor = "var(--primary)";
+                            setTimeout(() => fetchCustomers(), 800);
+                        } else {
+                            alert("Save failed. Try again.");
+                        }
+                    })
+                    .catch(e => {
+                        console.error("Save error:", e);
+                        alert("Save failed. Try again.");
+                    });
+            }
+
+            document.getElementById("customerForm").addEventListener("submit", async (e) => {
+                e.preventDefault();
+                
+                // Check if there's a completed measurement to save
+                const hasMeasurement = measurePoints.length >= 3;
+                const measurementData = hasMeasurement ? JSON.stringify({
+                    points: measurePoints,
+                    timestamp: new Date().toISOString(),
+                    priceRange: document.getElementById('quoteResult').textContent
+                }) : null;
+                
+                const name = document.getElementById("name").value;
+                const address = document.getElementById("address").value;
+                const phone = document.getElementById("phone").value;
+                const sqft = parseInt(document.getElementById("sqft").value) || currentSqft;
+                const notes = document.getElementById("notes").value;
+                
+                // Use calculated price range from measurement, or default calculation
+                const service_min = hasMeasurement ? currentPriceMin : sqft * 0.008;
+                const service_max = hasMeasurement ? currentPriceMax : sqft * 0.012;
+
+                try {
+                    // First, add the customer
+                    const res = await fetch("/add_customer", {
+                        method: "POST",
+                        body: new URLSearchParams({ name, address, phone, sqft, monthly_min: service_min, monthly_max: service_max, notes })
+                    });
+                    
+                    if (res.ok) {
+                        const result = await res.json();
+                        const newCustomerId = result.rowid;
+                        
+                        // If there's a measurement, save it for the new customer
+                        if (hasMeasurement && newCustomerId) {
+                            console.log('Auto-saving measurement for new customer:', newCustomerId);
+                            const formData = new FormData();
+                            formData.append('rowid', newCustomerId);
+                            formData.append('measurement_data', measurementData);
+                            formData.append('sqft', currentSqft);
+                            formData.append('monthly_min', currentPriceMin);
+                            formData.append('monthly_max', currentPriceMax);
+                            
+                            const saveRes = await fetch('/save_measurement', {
+                                method: 'POST',
+                                body: formData
+                            });
+                            
+                            const saveData = await saveRes.json();
+                            if (saveData.status === 'success') {
+                                console.log('Measurement auto-saved successfully');
+                            } else {
+                                console.error('Failed to auto-save measurement:', saveData.message);
+                            }
+                        }
+                        
+                        document.getElementById("customerForm").reset();
+                        clearMeasurements();
+                        fetchCustomers();
+                    } else {
+                        alert("Failed to add customer.");
+                    }
+                } catch (e) {
+                    console.error("Add error:", e);
+                    alert("Failed to add customer");
+                }
+            });
+
+            // Auto-populate measurement tool when address field loses focus
+            document.getElementById("address").addEventListener("blur", function() {
+                const address = this.value.trim();
+                if (address) {
+                    document.getElementById('measureAddress').value = address;
+                    searchMeasureAddress();
+                }
+            });
+
+            searchInput.addEventListener("input", () => {
+                if (editingElements.size === 0) {
+                    renderCustomers();
+                }
+            });
+
+            setInterval(() => {
+                if (editingElements.size === 0 && document.activeElement.tagName !== 'INPUT') {
+                    fetchCustomers();
+                }
+            }, 30000);
+
+
+            fetchCustomers();
+
+            function markService(rowid, button) {
+                button.style.opacity = '0.7';
+                fetch("/mark_service", {
+                    method: "POST",
+                    body: new URLSearchParams({ rowid: rowid.toString() })
+                })
+                    .then(res => {
+                        if (res.ok) {
+                            setTimeout(() => {
+                                fetchCustomers();
+                            }, 1000);
+                        } else {
+                            alert("Failed to mark service.");
+                        }
+                    })
+                    .catch(err => {
+                        alert("Failed: " + err);
+                    });
+            }
+
+            // ========== MEASUREMENT TOOL ==========
+            let measureMap = null;
+            let measurePoints = [];
+            let measurePolygon = null;
+            let measureMarkers = [];
+            let searchMarker = null;
+            let currentMeasureCustomerId = null;
+            
+            // Debug: Track when currentMeasureCustomerId changes
+            Object.defineProperty(window, 'currentMeasureCustomerId', {
+                get: function() { return this._currentMeasureCustomerId; },
+                set: function(value) {
+                    console.log('currentMeasureCustomerId changed from', this._currentMeasureCustomerId, 'to', value, 'Call stack:', new Error().stack);
+                    this._currentMeasureCustomerId = value;
+                }
+            });
+            
+            // Initialize the actual variable
+            currentMeasureCustomerId = null;
+            let currentSqft = 0;
+            let currentPriceMin = 0;
+            let currentPriceMax = 0;
+
+            function measureCustomer(rowid, address) {
+                console.log('=== measureCustomer called ===');
+                console.log('rowid:', rowid);
+                console.log('address:', address);
+                
+                // Scroll to measurement tool
+                document.querySelector('.customers-card').scrollIntoView({ behavior: 'smooth' });
+                
+                // Find customer data first
+                const customer = customerData.find(c => c[9] === rowid);
+                if (!customer) {
+                    console.error('Customer not found:', rowid);
+                    return;
+                }
+                
+                console.log('Loading measurement for customer:', rowid, 'Name:', customer[0]);
+                console.log('Measurement data:', customer[13]);
+                
+                // Set address in search box
+                document.getElementById('measureAddress').value = address;
+                
+                // Clear any existing measurement first
+                clearMeasurements();
+                
+                // Re-set the address (clearMeasurements clears it)
+                document.getElementById('measureAddress').value = address;
+                console.log('Address re-set to:', document.getElementById('measureAddress').value);
+                
+                // NOW set the current customer (after clearing)
+                currentMeasureCustomerId = rowid;
+                console.log('Set currentMeasureCustomerId to:', currentMeasureCustomerId);
+                console.log('Immediately after setting, currentMeasureCustomerId is:', currentMeasureCustomerId);
+                if (currentMeasureCustomerId !== rowid) {
+                    console.error('ERROR: Assignment failed! Expected', rowid, 'but got', currentMeasureCustomerId);
+                }
+                
+                // Show save button
+                document.getElementById('saveMeasurementBtn').style.display = 'inline-block';
+                
+                // If customer has saved measurement, load it
+                if (customer[13]) {
+                    try {
+                        const savedData = JSON.parse(customer[13]);
+                        console.log('Parsed saved data:', savedData);
+                        
+                        if (savedData.points && savedData.points.length >= 3) {
+                            console.log('Loading', savedData.points.length, 'saved points');
+                            
+                            // Add pagination controls
+                const totalPages = Math.ceil(filtered.length / CUSTOMERS_PER_PAGE);
+                if (totalPages > 1) {
+                    list.innerHTML += `
+                        <div class="pagination" style="display: flex; justify-content: center; gap: 1rem; margin-top: 2rem; padding: 1rem;">
+                            <button class="btn btn-secondary" ${currentPage === 1 ? 'disabled' : ''} onclick="changePage(${currentPage - 1})">
+                                ← Previous
+                            </button>
+                            <span style="padding: 0.5rem; font-weight: 600;">
+                                Page ${currentPage} of ${totalPages} (${filtered.length} customers)
+                            </span>
+                            <button class="btn btn-secondary" ${currentPage === totalPages ? 'disabled' : ''} onclick="changePage(${currentPage + 1})">
+                                Next →
+                            </button>
+                        </div>
+                    `;
+                }
+                            // Load saved points
+                            measurePoints = savedData.points;
+                            
+                            // Add markers for each point
+                            measurePoints.forEach(point => {
+                                const marker = L.circleMarker(point, {
+                                    radius: 6,
+                                    fillColor: '#2563eb',
+                                    color: '#1d4ed8',
+                                    weight: 2,
+                                    opacity: 1,
+                                    fillOpacity: 0.9
+                                }).addTo(measureMap);
+                                measureMarkers.push(marker);
+                            });
+                            
+                            // Show completed polygon with fill
+                            if (measurePolygon) {
+                                measureMap.removeLayer(measurePolygon);
+                            }
+                            measurePolygon = L.polygon(measurePoints, {
+                                color: '#16a34a',
+                                fillColor: '#22c55e',
+                                fillOpacity: 0.4,
+                                weight: 3
+                            }).addTo(measureMap);
+                            
+                            // Fit map to show the measurement
+                            measureMap.fitBounds(measurePolygon.getBounds(), { padding: [50, 50] });
+                            
+                            // Calculate and display results
+                            calculateMeasurements();
+                            
+                            // Override with saved price range if available
+                            if (savedData.priceRange) {
+                                document.getElementById('quoteResult').textContent = savedData.priceRange;
+                                // Parse the saved range
+                                const match = savedData.priceRange.match(/\$(\d+)\s+-\s+\$(\d+)/);
+                                if (match) {
+                                    currentPriceMin = parseInt(match[1]);
+                                    currentPriceMax = parseInt(match[2]);
+                                }
+                            }
+                            
+                            // If customer has actual_price, override with that
+                            if (customer[12]) {
+                                document.getElementById('quoteResult').textContent = '$' + customer[12].toFixed(0) + ' (Actual Price)';
+                            }
+                            
+                            console.log('Successfully loaded saved measurement');
+                            return; // Exit early since we loaded the saved measurement
+                        } else {
+                            console.log('Saved data has no points or less than 3 points');
+                        }
+                    } catch (e) {
+                        console.error('Error loading saved measurement:', e);
+                    }
+                } else {
+                    console.log('No saved measurement for this customer');
+                }
+                
+                // No saved measurement, just search the address and show pin
+                console.log('Searching address for new measurement');
+                searchMeasureAddress();
+            }
+
+            async function saveCurrentMeasurement() {
+                console.log('saveCurrentMeasurement called');
+                console.log('currentMeasureCustomerId:', currentMeasureCustomerId);
+                console.log('measurePoints length:', measurePoints.length);
+                
+                if (!currentMeasureCustomerId) {
+                    alert('No customer selected. Click "Measure Property" on a customer first.');
+                    return;
+                }
+                
+                if (measurePoints.length < 3) {
+                    alert('Please complete the measurement by drawing at least 3 points to form a polygon.');
+                    return;
+                }
+                
+                console.log('Preparing to save measurement...');
+                
+                try {
+                    const measurementData = JSON.stringify({
+                        points: measurePoints,
+                        timestamp: new Date().toISOString(),
+                        priceRange: document.getElementById('quoteResult').textContent
+                    });
+                    
+                    console.log('Measurement data prepared, length:', measurementData.length);
+                    
+                    const formData = new FormData();
+                    formData.append('rowid', currentMeasureCustomerId);
+                    formData.append('measurement_data', measurementData);
+                    formData.append('sqft', currentSqft);
+                    formData.append('monthly_min', currentPriceMin);
+                    formData.append('monthly_max', currentPriceMax);
+                    
+                    console.log('Sending save request...');
+                    const startTime = Date.now();
+                    
+                    const res = await fetch('/save_measurement', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    const endTime = Date.now();
+                    console.log('Save request completed in', endTime - startTime, 'ms');
+                    
+                    const data = await res.json();
+                    console.log('Save response:', data);
+                    
+                    if (data.status === 'success') {
+                        alert('Measurement saved successfully!');
+                        // Refresh customers to get updated data
+                        await fetchCustomers();
+                        // Clear measurement after successful save
+                        clearMeasurements();
+                    } else {
+                        alert('Error saving measurement: ' + data.message);
+                    }
+                } catch (e) {
+                    console.error('Save measurement error:', e);
+                    alert('Failed to save measurement: ' + e.message);
+                }
+            }
+
+            function initMeasurementMap() {
+                // Default to Keller, TX
+                measureMap = L.map('measurementMap').setView([32.9346, -97.2251], 16);
+                
+                L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                    attribution: 'Tiles © Esri',
+                    maxZoom: 22
+                }).addTo(measureMap);
+
+                // Add labels layer on top
+                L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
+                    maxZoom: 22
+                }).addTo(measureMap);
+
+                // Add click handler for drawing
+                measureMap.on('click', function(e) {
+                    addMeasurePoint(e.latlng);
+                });
+                
+                // Set cursor to crosshair for better precision
+                measureMap.getContainer().style.cursor = 'crosshair';
+
+                // Double-click to complete
+                measureMap.on('dblclick', function(e) {
+                    L.DomEvent.stop(e);
+                    completeMeasurement();
+                });
+                
+                // Add Enter key listener to address input
+                document.getElementById('measureAddress').addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter') {
+                        searchMeasureAddress();
+                    }
+                });
+            }
+
+            function addMeasurePoint(latlng) {
+                // Check if clicking near first point to close polygon
+                if (measurePoints.length >= 3) {
+                    const firstPoint = measurePoints[0];
+                    const distance = Math.sqrt(
+                        Math.pow(latlng.lat - firstPoint[0], 2) + 
+                        Math.pow(latlng.lng - firstPoint[1], 2)
+                    );
+                    // If within ~5 feet (0.000015 degrees) of first point, close the polygon
+                    if (distance < 0.000015) {
+                        completeMeasurement();
+                        return;
+                    }
+                }
+                
+                measurePoints.push([latlng.lat, latlng.lng]);
+                
+                // Enable remove button
+                document.getElementById('removePointBtn').disabled = measurePoints.length === 0;
+                
+                // Add marker
+                const marker = L.circleMarker(latlng, {
+                    radius: 6,
+                    fillColor: '#2563eb',
+                    color: '#1d4ed8',
+                    weight: 2,
+                    opacity: 1,
+                    fillOpacity: 0.9
+                }).addTo(measureMap);
+                measureMarkers.push(marker);
+
+                // Update polygon
+                updateMeasurePolygon();
+            }
+
+            function updateMeasurePolygon() {
+                if (measurePolygon) {
+                    measureMap.removeLayer(measurePolygon);
+                }
+                
+                // Use polyline for incomplete shape (doesn't auto-close)
+                if (measurePoints.length >= 2) {
+                    measurePolygon = L.polyline(measurePoints, {
+                        color: '#2563eb',
+                        fillColor: '#3b82f6',
+                        fillOpacity: 0,
+                        weight: 3,
+                        dashArray: '5, 10'
+                    }).addTo(measureMap);
+                }
+            }
+
+            function calculateMeasurements() {
+                if (measurePoints.length < 3) return;
+
+                // Calculate area using shoelace formula
+                let area = 0;
+                let perimeter = 0;
+                const n = measurePoints.length;
+
+                for (let i = 0; i < n; i++) {
+                    const j = (i + 1) % n;
+                    
+                    // Area calculation (shoelace formula)
+                    area += measurePoints[i][1] * measurePoints[j][0];
+                    area -= measurePoints[j][1] * measurePoints[i][0];
+                    
+                    // Perimeter calculation (Haversine distance)
+                    perimeter += haversineDistance(
+                        measurePoints[i][0], measurePoints[i][1],
+                        measurePoints[j][0], measurePoints[j][1]
+                    );
+                }
+                
+                area = Math.abs(area) / 2;
+                
+                // Convert from degrees² to square feet
+                // At 32.9° latitude, 1 degree lat ≈ 364,000 ft, 1 degree lng ≈ 307,000 ft
+                const latScale = 364000;
+                const lngScale = 307000;
+                currentSqft = Math.round(area * latScale * lngScale);
+                const acres = currentSqft / 43560;
+                
+                // Calculate quote using SAME formula as python4.py:
+                // base_small=3000, base_large=10000, price_small=50, price_large=100, treatments=7
+                const baseSmall = 3000;
+                const baseLarge = 10000;
+                const priceSmall = 50;
+                const priceLarge = 100;
+                const treatments = 7;
+                
+                let pricePerTreatment;
+                if (currentSqft <= baseSmall) {
+                    pricePerTreatment = priceSmall;
+                } else if (currentSqft >= baseLarge) {
+                    pricePerTreatment = priceLarge * (currentSqft / baseLarge);
+                } else {
+                    const ratio = (currentSqft - baseSmall) / (baseLarge - baseSmall);
+                    pricePerTreatment = priceSmall + ratio * (priceLarge - priceSmall);
+                }
+                
+                // Range is ±10% of calculated price per treatment
+                currentPriceMin = Math.round(pricePerTreatment * 0.9);
+                currentPriceMax = Math.round(pricePerTreatment * 1.1);
+
+                document.getElementById('areaResult').textContent = currentSqft.toLocaleString();
+                document.getElementById('acreResult').textContent = acres.toFixed(2);
+                document.getElementById('quoteResult').textContent = '$' + currentPriceMin.toFixed(0) + ' - $' + currentPriceMax.toFixed(0);
+                
+                // Auto-populate sqft in Add New Customer form
+                document.getElementById('sqft').value = currentSqft;
+            }
+
+            function haversineDistance(lat1, lng1, lat2, lng2) {
+                const R = 3959; // Earth's radius in miles
+                const dLat = (lat2 - lat1) * Math.PI / 180;
+                const dLng = (lng2 - lng1) * Math.PI / 180;
+                const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                         Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                         Math.sin(dLng/2) * Math.sin(dLng/2);
+                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+                return R * c; // Distance in miles
+            }
+
+            function completeMeasurement() {
+                if (measurePoints.length < 3) {
+                    alert("Need at least 3 points to calculate area");
+                    return;
+                }
+                calculateMeasurements();
+                
+                // Solidify the polygon
+                if (measurePolygon) {
+                    measureMap.removeLayer(measurePolygon);
+                }
+                measurePolygon = L.polygon(measurePoints, {
+                    color: '#16a34a',
+                    fillColor: '#22c55e',
+                    fillOpacity: 0.4,
+                    weight: 3
+                }).addTo(measureMap);
+                
+                // Measurement completed - user must manually save or it auto-saves with +Add Customer
+                
+                // Update results
+                calculateMeasurements();
+            }
+
+            function removeLastPoint() {
+                if (measurePoints.length === 0) return;
+                
+                // Remove last point
+                measurePoints.pop();
+                
+                // Remove last marker
+                if (measureMarkers.length > 0) {
+                    const lastMarker = measureMarkers.pop();
+                    measureMap.removeLayer(lastMarker);
+                }
+                
+                // Update polygon
+                updateMeasurePolygon();
+                
+                // Disable remove button if no points left
+                document.getElementById('removePointBtn').disabled = measurePoints.length === 0;
+                
+                // Reset results if less than 3 points
+                if (measurePoints.length < 3) {
+                    document.getElementById('areaResult').textContent = '0';
+                    document.getElementById('acreResult').textContent = '0';
+                    document.getElementById('quoteResult').textContent = '$0 - $0';
+                }
+            }
+
+            function clearMeasurements(keepCustomerId = false) {
+                console.log('=== clearMeasurements called ===');
+                console.log('keepCustomerId:', keepCustomerId);
+                console.log('currentMeasureCustomerId before clear:', currentMeasureCustomerId);
+                console.log('Call stack:', new Error().stack);
+                
+                measurePoints = [];
+                if (!keepCustomerId) {
+                    currentMeasureCustomerId = null;
+                }
+                currentSqft = 0;
+                currentPriceMin = 0;
+                currentPriceMax = 0;
+                
+                if (measurePolygon) {
+                    measureMap.removeLayer(measurePolygon);
+                    measurePolygon = null;
+                }
+                
+                // Clear ALL markers from the map
+                measureMarkers.forEach(m => {
+                    if (measureMap.hasLayer(m)) {
+                        measureMap.removeLayer(m);
+                    }
+                });
+                measureMarkers = [];
+                
+                // Clear search marker if exists
+                if (searchMarker) {
+                    measureMap.removeLayer(searchMarker);
+                    searchMarker = null;
+                }
+                
+                // Reset UI
+                document.getElementById('areaResult').textContent = '0';
+                document.getElementById('acreResult').textContent = '0';
+                document.getElementById('quoteResult').textContent = '$0 - $0';
+                document.getElementById('removePointBtn').disabled = true;
+                document.getElementById('saveMeasurementBtn').style.display = 'none';
+                document.getElementById('measureAddress').value = '';
+                
+                console.log('currentMeasureCustomerId after clear:', currentMeasureCustomerId);
+            }
+
+            async function searchMeasureAddress() {
+                console.log('=== searchMeasureAddress called ===');
+                const address = document.getElementById('measureAddress').value;
+                console.log('Address:', address);
+                if (!address) {
+                    console.log('No address, returning');
+                    return;
+                }
+                
+                try {
+                    const fullAddress = address + ', Texas, USA';
+                    console.log('Full address:', fullAddress);
+                    const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(fullAddress)}`);
+                    console.log('Response status:', response.status);
+                    const data = await response.json();
+                    console.log('Data:', data);
+                    
+                    if (data && data.length > 0) {
+                        const lat = parseFloat(data[0].lat);
+                        const lng = parseFloat(data[0].lon);
+                        console.log('Moving map to:', lat, lng);
+                        measureMap.setView([lat, lng], 18);
+                        console.log('Map moved');
+                        
+                        // Add a marker at the searched location
+                        searchMarker = L.marker([lat, lng]).addTo(measureMap)
+                            .bindPopup(address)
+                            .openPopup();
+                    } else {
+                        console.log('Address not found');
+                        alert('Address not found');
+                    }
+                } catch (e) {
+                    console.error('Geocoding error:', e);
+                    alert('Failed to search address');
+                }
+            }
+
+            // Initialize map when page loads
+            document.addEventListener('DOMContentLoaded', function() {
+                initMeasurementMap();
+                fetchCustomers();
+            });
+        </script>
+    </div>
+</body>
+</html>

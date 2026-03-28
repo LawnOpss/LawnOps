@@ -1,0 +1,2383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Administration – Python Lawn</title>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet" />
+
+  <style>
+    :root {
+      --primary: #2563eb;
+      --primary-dark: #1d4ed8;
+      --primary-light: #dbeafe;
+      --secondary: #64748b;
+      --accent: #0f172a;
+      --light: #f8fafc;
+      --dark: #1e293b;
+      --white: #ffffff;
+      --gray-50: #f8fafc;
+      --gray-100: #f1f5f9;
+      --gray-200: #e2e8f0;
+      --gray-300: #cbd5e1;
+      --gray-400: #94a3b8;
+      --gray-500: #64748b;
+      --gray-600: #475569;
+      --gray-700: #334155;
+      --gray-800: #1e293b;
+      --gray-900: #0f172a;
+      --success: #16a34a;
+      --error: #ef4444;
+      --warning: #f59e0b;
+      --border-color: #e5e7eb;
+      --text-primary: #111827;
+      --text-secondary: #4b5563;
+      --bg-light: #ffffff;
+      --bg-secondary: #f9fafb;
+      --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+      --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+      --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+      --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background-color: var(--bg-secondary);
+      color: var(--text-primary);
+      line-height: 1.6;
+    }
+
+    /* NAVBAR */
+    .navbar {
+      background: var(--bg-light);
+      box-shadow: var(--shadow-md);
+      padding: 1rem 0;
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .navbar-content {
+      max-width: 1600px;
+      margin: 0 auto;
+      padding: 0 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .navbar-brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--primary);
+      text-decoration: none;
+    }
+
+    .navbar-nav {
+      display: flex;
+      gap: 2rem;
+      align-items: center;
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    .navbar-nav a {
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: 0.95rem;
+      font-weight: 500;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 0.75rem;
+      border-radius: 0.375rem;
+    }
+
+    .navbar-nav a:hover {
+      color: var(--primary);
+      background-color: rgba(30, 64, 175, 0.05);
+    }
+
+    /* CONTAINER */
+    .container {
+      max-width: 1600px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+
+    /* PAGE HEADER */
+    .page-header {
+      margin-bottom: 2rem;
+    }
+
+    .page-title {
+      font-size: 2rem;
+      font-weight: 800;
+      color: var(--secondary);
+      margin: 0 0 0.5rem 0;
+    }
+
+    .page-subtitle {
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+      margin: 0;
+    }
+
+    /* TABS */
+    .tabs {
+      display: flex;
+      gap: 0;
+      border-bottom: 2px solid var(--border-color);
+      margin-bottom: 2rem;
+    }
+
+    .tab-btn {
+      background: none;
+      border: none;
+      padding: 1rem 1.5rem;
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      cursor: pointer;
+      border-bottom: 3px solid transparent;
+      transition: all 0.3s ease;
+      margin-bottom: -2px;
+    }
+
+    .tab-btn:hover:not(.active) {
+      color: var(--text-primary);
+    }
+
+    .tab-btn.active {
+      color: var(--primary);
+      border-bottom-color: var(--primary);
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+      animation: fadeIn 0.3s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    /* SECTION HEADER */
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.5rem;
+      padding-bottom: 1rem;
+      border-bottom: 2px solid var(--border-color);
+    }
+
+    .section-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin: 0;
+    }
+
+    /* CARDS AND PANELS */
+    .card {
+      background: var(--bg-light);
+      border: 1px solid var(--border-color);
+      border-radius: 0.75rem;
+      padding: 1.5rem;
+      box-shadow: var(--shadow-sm);
+      transition: all 0.3s ease;
+    }
+
+    .card:hover {
+      box-shadow: var(--shadow-lg);
+      border-color: var(--primary-light);
+    }
+
+    /* FORMS */
+    .form-group {
+      margin-bottom: 1rem;
+    }
+
+    .form-label {
+      display: block;
+      font-weight: 600;
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 0.5rem;
+    }
+
+    .form-input,
+    .form-select {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      border: 1px solid var(--border-color);
+      border-radius: 0.5rem;
+      font-size: 0.95rem;
+      color: var(--text-primary);
+      background: var(--bg-light);
+      transition: all 0.2s ease;
+    }
+
+    .form-input:focus,
+    .form-select:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(30, 64, 175, 0.1);
+    }
+
+    /* BUTTONS */
+    .btn {
+      padding: 0.75rem 1.5rem;
+      border: none;
+      border-radius: 0.5rem;
+      font-weight: 600;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: var(--primary-dark);
+    }
+
+    .btn-secondary {
+      background: var(--bg-secondary);
+      color: var(--text-primary);
+      border: 1px solid var(--border-color);
+    }
+
+    .btn-secondary:hover {
+      background: var(--border-color);
+    }
+
+    .btn-danger {
+      background: var(--error);
+      color: white;
+    }
+
+    .btn-danger:hover {
+      background: #dc2626;
+    }
+
+    .btn-sm {
+      padding: 0.35rem 0.75rem;
+      font-size: 0.8rem;
+    }
+
+    /* GRASS TYPE SECTIONS */
+    .grass-type-section {
+      background: var(--bg-light);
+      border: 1px solid var(--border-color);
+      border-radius: 0.75rem;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .grass-type-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.5rem;
+      padding-bottom: 1rem;
+      border-bottom: 2px solid var(--border-color);
+    }
+
+    .grass-type-name {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--primary);
+    }
+
+    .treatment-container {
+      display: grid;
+      gap: 1rem;
+    }
+
+    .treatment {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 0.5rem;
+      padding: 1rem;
+      transition: all 0.2s ease;
+    }
+
+    .treatment:hover {
+      box-shadow: var(--shadow-md);
+      border-color: var(--primary-light);
+    }
+
+    .treatment.dragging {
+      opacity: 0.5;
+    }
+
+    .treatment.drag-over {
+      border-top: 3px solid var(--primary);
+      padding-top: calc(1rem - 3px);
+    }
+
+    .treatment-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+      cursor: move;
+      user-select: none;
+    }
+
+    .treatment-title {
+      font-weight: 700;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .treatment-title small {
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      font-weight: 400;
+    }
+
+    /* LISTS */
+    .item-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 0.5rem;
+    }
+
+    .item-list li {
+      background: var(--bg-light);
+      border: 1px solid var(--border-color);
+      border-radius: 0.375rem;
+      padding: 0.5rem 0.75rem;
+      font-size:0.9rem;
+      color: var(--text-primary);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .item-tag {
+      background: rgba(30, 64, 175, 0.1);
+      color: var(--primary-dark);
+      padding: 0.25rem 0.5rem;
+      border-radius: 0.25rem;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+
+    /* SIDEBAR BOXES */
+    .sidebar-box {
+      background: var(--bg-light);
+      border: 1px solid var(--border-color);
+      border-radius: 0.75rem;
+      padding: 1.5rem;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .sidebar-box h3 {
+      margin: 0 0 0.5rem 0;
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .sidebar-box p {
+      margin: 0 0 1rem 0;
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+    }
+
+    /* LOCATION CARDS */
+    .location-card {
+      background: var(--bg-light);
+      border: 1px solid var(--border-color);
+      border-radius: 0.75rem;
+      padding: 1.5rem;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 1.5rem;
+      align-items: start;
+      transition: all 0.3s ease;
+    }
+
+    .location-card:hover {
+      box-shadow: var(--shadow-lg);
+      border-color: var(--primary-light);
+    }
+
+    .location-info {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .location-name {
+      font-weight: 700;
+      font-size: 1.1rem;
+      color: var(--primary);
+    }
+
+    .location-detail {
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+    }
+
+    .location-detail strong {
+      color: var(--text-primary);
+    }
+
+    .location-actions {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    /* BREADCRUMB-STYLE FORM PANEL */
+    .form-panel {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 0.75rem;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .form-panel h3 {
+      margin: 0 0 1rem 0;
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    /* RESPONSIVE */
+    @media (max-width: 768px) {
+      .container {
+        padding: 1rem;
+      }
+
+      .page-title {
+        font-size: 1.5rem;
+      }
+
+      .location-card {
+        grid-template-columns: 1fr;
+      }
+
+      .location-actions {
+        justify-content: flex-start;
+      }
+
+      .navbar-nav {
+        gap: 1rem;
+        font-size: 0.8rem;
+      }
+    }
+  </style>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+  <script>
+    const ADMIN_KEY = "202024";
+    let adminUnlocked = false;
+    
+    function checkAdminKey() {
+      const input = document.getElementById('adminKeyInput');
+      const gate = document.getElementById('adminGate');
+      const error = document.getElementById('adminError');
+      
+      if (!input || !gate) {
+        console.error('Required elements not found!');
+        return;
+      }
+      
+      if (input.value === ADMIN_KEY) {
+        adminUnlocked = true;
+        gate.style.display = 'none';
+        console.log('Admin unlocked');
+      } else {
+        if (error) error.style.display = 'block';
+        input.value = '';
+        input.focus();
+      }
+    }
+  </script>
+</head>
+
+<body>
+  <!-- ADMIN KEY GATE -->
+  <div id="adminGate" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg-secondary); z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center;">
+    <div style="background: var(--white); padding: 2rem; border-radius: 12px; box-shadow: var(--shadow-xl); text-align: center; max-width: 400px; width: 90%;">
+      <i class="fas fa-lock" style="font-size: 2.5rem; color: var(--primary); margin-bottom: 1rem;"></i>
+      <h2 style="margin: 0 0 0.5rem 0; color: var(--text-primary);">Admin Access</h2>
+      <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">Enter the 6-digit admin key to continue</p>
+      <input type="password" id="adminKeyInput" maxlength="6" placeholder="000000" style="width: 100%; padding: 1rem; font-size: 1.5rem; text-align: center; letter-spacing: 0.5rem; border: 2px solid var(--border-color); border-radius: 8px; margin-bottom: 1rem;">
+      <button onclick="checkAdminKey()" style="width: 100%; padding: 1rem; background: var(--primary); color: var(--white); border: none; border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer;">Access Admin</button>
+      <p id="adminError" style="color: var(--error); margin-top: 1rem; display: none;">Invalid key. Try again.</p>
+    </div>
+  </div>
+
+  <!-- NAVBAR -->
+  <nav class="navbar">
+    <div class="navbar-content">
+      <a href="/" class="navbar-brand">
+        <i class="fas fa-leaf"></i> LawnOps
+      </a>
+      <ul class="navbar-nav">
+        <li><a href="/"><i class="fas fa-home"></i> Dashboard</a></li>
+        <li><a href="/owner"><i class="fas fa-cog"></i> Admin</a></li>
+        <li><a href="/routing.html"><i class="fas fa-route"></i> Routing</a></li>
+        <li><a href="/analytics"><i class="fas fa-chart-line"></i> Analytics</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <div class="container">
+    <!-- PAGE HEADER -->
+    <div class="page-header">
+      <h1 class="page-title"><i class="fas fa-cogs"></i> Administration</h1>
+      <p class="page-subtitle">Manage treatment plans, locations, and system configuration</p>
+    </div>
+
+    <!-- TABS -->
+    <div class="tabs">
+      <button id="tab-treatments" class="tab-btn active" data-tab="treatments">
+        <i class="fas fa-prescription-bottle"></i> Treatment Plans
+      </button>
+      <button id="tab-locations" class="tab-btn" data-tab="locations">
+        <i class="fas fa-map-location-dot"></i> Locations
+      </button>
+      <button id="tab-technicians" class="tab-btn" data-tab="technicians">
+        <i class="fas fa-user-hard-hat"></i> Technicians
+      </button>
+    </div>
+
+    <!-- ==================== TREATMENT PLANS TAB ==================== -->
+    <div id="treatments" class="tab-content active">
+      <!-- Add Grass Type -->
+      <div class="form-panel">
+        <h3><i class="fas fa-leaf"></i> Add Grass Type</h3>
+        <div class="form-group">
+          <input type="text" id="grassTypeInput" class="form-input" placeholder="e.g. Bermuda, St. Augustine, Zoysia..." autocomplete="off" />
+        </div>
+        <button id="addGrassTypeBtn" class="btn btn-primary">
+          <i class="fas fa-plus"></i> Add Grass Type
+        </button>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 320px; gap: 2rem; align-items: start;">
+        <!-- Main treatments area -->
+        <div id="grassTypesContainer"></div>
+
+        <!-- Right sidebar -->
+        <div style="display: grid; gap: 1.5rem; position: sticky; top: 120px;">
+          <!-- Chemicals -->
+          <div class="sidebar-box">
+            <h3><i class="fas fa-flask"></i> Chemicals</h3>
+            <p>Global chemical library</p>
+            <div class="form-group">
+              <input type="text" id="chemAutoInput"  class="form-input" placeholder="Add chemical..." />
+            </div>
+            <ul class="item-list" id="chemAutoList"></ul>
+          </div>
+
+          <!-- Condition Codes -->
+          <div class="sidebar-box">
+            <h3><i class="fas fa-stethoscope"></i> Condition Codes</h3>
+            <p>Lawn condition diagnostics</p>
+            <div class="form-group">
+              <input type="text" id="condInput" class="form-input" placeholder="Add code..." />
+            </div>
+            <ul class="item-list" id="condList"></ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== LOCATIONS TAB ==================== -->
+    <div id="locations" class="tab-content">
+      <div class="card">
+        <div class="section-header">
+          <h2 class="section-title"><i class="fas fa-building"></i> Office Locations</h2>
+        </div>
+        <p style="color: var(--text-secondary); margin: 0 0 1.5rem 0;">Create and manage office locations where your business operates. Store addresses, phone numbers, and service area zip codes for each office.</p>
+
+        <!-- Add Location Form -->
+        <div class="form-panel">
+          <h3><i class="fas fa-plus-circle"></i> Add New Location</h3>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Location Name *</label>
+              <input type="text" id="newLocName" class="form-input" placeholder="e.g. Main Office, North Branch, Downtown HQ" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Address</label>
+              <input type="text" id="newLocAddress" class="form-input" placeholder="e.g. 123 Main St, City, ST" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Service Area (Zip Codes)</label>
+              <input type="text" id="newLocZips" class="form-input" placeholder="e.g. 75025, 75026, 75027" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Phone</label>
+              <input type="text" id="newLocPhone" class="form-input" placeholder="e.g. (555) 123-4567" />
+            </div>
+          </div>
+          <button id="addLocationBtn" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Add Location
+          </button>
+        </div>
+
+        <!-- Locations List -->
+        <div style="margin-top: 2rem;">
+          <h3 style="margin-bottom: 1rem; color: var(--text-primary);">
+            <i class="fas fa-list"></i> Locations
+          </h3>
+          <div id="locationsList" style="display: grid; gap: 1rem;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== TECHNICIANS TAB ==================== -->
+    <div id="technicians" class="tab-content">
+      <div class="card">
+        <div class="section-header">
+          <h2 class="section-title"><i class="fas fa-user-hard-hat"></i> Technician Management</h2>
+        </div>
+        <p style="color: var(--text-secondary); margin: 0 0 1.5rem 0;">Add and manage technicians. Assign them to office locations and set their profile colors.</p>
+
+        <!-- Add Technician Form -->
+        <div class="form-panel">
+          <h3><i class="fas fa-plus-circle"></i> Add New Technician</h3>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Technician Name *</label>
+              <input type="text" id="newTechName" class="form-input" placeholder="e.g. John Smith" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Location *</label>
+              <select id="newTechLocation" class="form-input">
+                <option value="">Select a location...</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Profile Color</label>
+              <input type="color" id="newTechColor" class="form-input" value="#3b82f6" style="height: 40px;" />
+            </div>
+            <div class="form-group" style="display: flex; align-items: flex-end;">
+              <button id="addTechnicianBtn" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Add Technician
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Territory Management -->
+        <div style="margin-top: 2rem;">
+          <h3 style="margin-bottom: 1rem; color: var(--text-primary);">
+            <i class="fas fa-map"></i> Service Area Management
+          </h3>
+          <div class="form-panel">
+            <p style="color: var(--text-secondary); margin: 0 0 1rem 0;">Choose between automatic territory assignment or manual drawing.</p>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Select Office Location</label>
+                <select id="territoryLocation" class="form-input">
+                  <option value="">Select an office location...</option>
+                </select>
+              </div>
+              <div class="form-group" style="display: flex; align-items: flex-end; gap: 0.5rem;">
+                <button id="autoAssignTerritoriesBtn" class="btn btn-secondary">
+                  <i class="fas fa-magic"></i> Auto-Assign
+                </button>
+                <button id="unassignTerritoriesBtn" class="btn btn-danger">
+                  <i class="fas fa-trash-alt"></i> Unassign All
+                </button>
+                <button id="drawTerritoriesBtn" class="btn btn-primary">
+                  <i class="fas fa-draw-polygon"></i> Draw Territories
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Technicians List -->
+        <div style="margin-top: 2rem;">
+          <h3 style="margin-bottom: 1rem; color: var(--text-primary);">
+            <i class="fas fa-list"></i> Technicians
+          </h3>
+          <div id="techniciansList" style="display: grid; gap: 1rem;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Territory Drawing Modal -->
+  <div id="territoryModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10000; justify-content: center; align-items: center;">
+    <div style="background: white; border-radius: 12px; width: 90%; max-width: 1200px; height: 85%; display: flex; flex-direction: column; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);">
+      <!-- Modal Header -->
+      <div style="padding: 1.5rem; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center;">
+        <h2 style="margin: 0; color: #1f2937; font-size: 1.5rem;">
+          <i class="fas fa-draw-polygon"></i> Draw Service Areas
+        </h2>
+        <button onclick="closeTerritoryModal()" style="background: none; border: none; font-size: 1.5rem; color: #6b7280; cursor: pointer;">&times;</button>
+      </div>
+      
+      <!-- Controls -->
+      <div style="padding: 1rem; border-bottom: 1px solid #e5e7eb; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+          <label style="font-weight: 600; color: #374151;">Technician:</label>
+          <select id="drawingTechnician" style="padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px;">
+            <option value="">Select technician...</option>
+          </select>
+        </div>
+        <div style="display: flex; gap: 0.5rem;">
+          <button id="startDrawingBtn" class="btn btn-primary" style="font-size: 0.9rem;">
+            <i class="fas fa-pencil-alt"></i> Start Drawing
+          </button>
+        </div>
+        <div id="drawingStatus" style="margin-left: auto; padding: 0.5rem 1rem; background: #fef3c7; color: #92400e; border-radius: 6px; font-size: 0.9rem; display: none;">
+          Click on the map to draw service area boundary
+        </div>
+      </div>
+      
+      <!-- Map Container -->
+      <div style="flex: 1; position: relative;">
+        <div id="territoryMap" style="width: 100%; height: 100%; border-radius: 0 0 12px 12px;"></div>
+      </div>
+    </div>
+  </div>
+      const error = document.getElementById('adminError');
+      
+      console.log('Input element:', input);
+      console.log('Gate element:', gate);
+      console.log('Input value:', input ? input.value : 'null');
+      console.log('Expected key:', ADMIN_KEY);
+      
+      if (!input || !gate) {
+        console.error('Required elements not found!');
+        return;
+      }
+      
+      if (input.value === ADMIN_KEY) {
+        console.log('Key matched! Hiding gate...');
+        // Admin gate - unlocked in memory only (resets on page refresh/close)
+    let adminUnlocked = false;
+    
+    function checkAdminKey() {
+        const input = document.getElementById('adminKeyInput').value;
+        if (input === ADMIN_KEY) {
+            adminUnlocked = true;
+            document.getElementById('adminGate').style.display = 'none';
+        } else {
+            document.getElementById('adminError').style.display = 'block';
+            document.getElementById('adminKeyInput').value = '';
+            document.getElementById('adminKeyInput').focus();
+        }
+    }
+    
+    // Show gate on load
+    document.getElementById('adminGate').style.display = 'flex';
+        sessionStorage.setItem('adminAuthenticated', 'true');
+        gate.style.display = 'none';
+        console.log('Gate hidden');
+      } else {
+        console.log('Key did not match');
+        if (error) error.style.display = 'block';
+        input.value = '';
+        input.focus();
+      }
+    }
+
+    // Allow Enter key to submit
+    document.getElementById('adminKeyInput').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') {
+        checkAdminKey();
+      }
+    });
+
+    let config = {
+      grassTypes: [],
+      conditionCodes: [],
+      chemicalAutos: [],
+      condCodeIds: {},  // "code_name" -> id
+      chemAutoIds: {}   // "chemical_name" -> id
+    };
+
+    async function loadAllData() {
+      try {
+        const plansRes = await fetch(`${API_BASE}/treatment-plans`);
+        const plansData = await plansRes.json();
+        config.grassTypes = plansData.grassTypes;
+
+        const globalRes = await fetch(`${API_BASE}/global-data`);
+        const globalData = await globalRes.json();
+        
+        // Extract names for display, store IDs for deletion
+        config.conditionCodes = globalData.conditionCodes.map(c => c.name);
+        config.condCodeIds = {};
+        globalData.conditionCodes.forEach(c => {
+          config.condCodeIds[c.name] = c.id;
+        });
+        
+        config.chemicalAutos = globalData.chemicalAutos.map(c => c.name);
+        config.chemAutoIds = {};
+        globalData.chemicalAutos.forEach(c => {
+          config.chemAutoIds[c.name] = c.id;
+        });
+
+        renderAll();
+      } catch (e) {
+        console.error("Load error:", e);
+      }
+    }
+
+    async function createGrassType(name) {
+      const formData = new FormData();
+      formData.append("grass_type_name", name);
+      try {
+        const res = await fetch(`${API_BASE}/treatment-plans`, {
+          method: "POST",
+          body: formData
+        });
+        const data = await res.json();
+        if (data.status === "success") {
+          await loadAllData();
+          return true;
+        } else {
+          alert("Error: " + data.message);
+          return false;
+        }
+      } catch (e) {
+        console.error("Create grass type error:", e);
+        return false;
+      }
+    }
+
+    async function deleteGrassTypeFromDB(planId) {
+      try {
+        const res = await fetch(`${API_BASE}/treatment-plans/${planId}`, {
+          method: "DELETE"
+        });
+        const data = await res.json();
+        if (data.status === "success") {
+          await loadAllData();
+          return true;
+        }
+      } catch (e) {
+        console.error("Delete grass type error:", e);
+      }
+      return false;
+    }
+
+    async function addTreatment(planId) {
+      const formData = new FormData();
+      formData.append("plan_id", planId);
+      try {
+        const res = await fetch(`${API_BASE}/treatments`, {
+          method: "POST",
+          body: formData
+        });
+        const data = await res.json();
+        if (data.status === "success") {
+          await loadAllData();
+          return true;
+        }
+      } catch (e) {
+        console.error("Add treatment error:", e);
+      }
+      return false;
+    }
+
+    async function deleteTreatmentFromDB(treatmentId) {
+      try {
+        const res = await fetch(`${API_BASE}/treatments/${treatmentId}`, {
+          method: "DELETE"
+        });
+        const data = await res.json();
+        if (data.status === "success") {
+          await loadAllData();
+          return true;
+        }
+      } catch (e) {
+        console.error("Delete treatment error:", e);
+      }
+      return false;
+    }
+
+    async function addChemicalToTreatment(treatmentId, chemical) {
+      const formData = new FormData();
+      formData.append("chemical", chemical);
+      try {
+        const res = await fetch(`${API_BASE}/treatments/${treatmentId}/chems`, {
+          method: "POST",
+          body: formData
+        });
+        const data = await res.json();
+        if (data.status === "success") {
+          await loadAllData();
+          return true;
+        }
+      } catch (e) {
+        console.error("Add chemical error:", e);
+      }
+      return false;
+    }
+
+    async function deleteChemicalFromTreatment(treatmentId, index) {
+      try {
+        const res = await fetch(`${API_BASE}/treatments/${treatmentId}/chems/${index}`, {
+          method: "DELETE"
+        });
+        const data = await res.json();
+        if (data.status === "success") {
+          await loadAllData();
+          return true;
+        }
+      } catch (e) {
+        console.error("Delete chemical error:", e);
+      }
+      return false;
+    }
+
+    async function addNoteToTreatment(treatmentId, note) {
+      const formData = new FormData();
+      formData.append("note", note);
+      try {
+        const res = await fetch(`${API_BASE}/treatments/${treatmentId}/notes`, {
+          method: "POST",
+          body: formData
+        });
+        const data = await res.json();
+        if (data.status === "success") {
+          await loadAllData();
+          return true;
+        }
+      } catch (e) {
+        console.error("Add note error:", e);
+      }
+      return false;
+    }
+
+    async function deleteNoteFromTreatment(treatmentId, index) {
+      try {
+        const res = await fetch(`${API_BASE}/treatments/${treatmentId}/notes/${index}`, {
+          method: "DELETE"
+        });
+        const data = await res.json();
+        if (data.status === "success") {
+          await loadAllData();
+          return true;
+        }
+      } catch (e) {
+        console.error("Delete note error:", e);
+      }
+      return false;
+    }
+
+    async function addConditionCode(code) {
+      const formData = new FormData();
+      formData.append("code_name", code);
+      try {
+        const res = await fetch(`${API_BASE}/condition-codes`, {
+          method: "POST",
+          body: formData
+        });
+        const data = await res.json();
+        if (data.status === "success") {
+          await loadAllData();
+          return true;
+        } else {
+          alert("Error: " + data.message);
+          return false;
+        }
+      } catch (e) {
+        console.error("Add condition code error:", e);
+      }
+      return false;
+    }
+
+    async function deleteConditionCodeFromDB(codeId) {
+      try {
+        const res = await fetch(`${API_BASE}/condition-codes/${codeId}`, {
+          method: "DELETE"
+        });
+        const data = await res.json();
+        if (data.status === "success") {
+          await loadAllData();
+          return true;
+        }
+      } catch (e) {
+        console.error("Delete condition code error:", e);
+      }
+      return false;
+    }
+
+    async function addChemicalAuto(chemical) {
+      const formData = new FormData();
+      formData.append("chemical_name", chemical);
+      try {
+        const res = await fetch(`${API_BASE}/chemical-autos`, {
+          method: "POST",
+          body: formData
+        });
+        const data = await res.json();
+        if (data.status === "success") {
+          await loadAllData();
+          return true;
+        } else {
+          alert("Error: " + data.message);
+          return false;
+        }
+      } catch (e) {
+        console.error("Add chemical auto error:", e);
+      }
+      return false;
+    }
+
+    async function deleteChemicalAutoFromDB(chemId) {
+      try {
+        const res = await fetch(`${API_BASE}/chemical-autos/${chemId}`, {
+          method: "DELETE"
+        });
+        const data = await res.json();
+        if (data.status === "success") {
+          await loadAllData();
+          return true;
+        }
+      } catch (e) {
+        console.error("Delete chemical auto error:", e);
+      }
+      return false;
+    }
+
+    // ============ RENDERING ============
+    function renderConditionList() {
+      const list = document.getElementById("condList");
+      list.innerHTML = "";
+      config.conditionCodes.forEach((code, idx) => {
+        const li = document.createElement("li");
+        li.innerHTML = `
+          <span>${code}</span>
+          <button class="btn btn-sm btn-danger" onclick="deleteConditionCodeUI(${idx})"><i class="fas fa-trash"></i></button>
+        `;
+        list.appendChild(li);
+      });
+    }
+
+    function renderChemicalAutoList() {
+      const list = document.getElementById("chemAutoList");
+      list.innerHTML = "";
+      config.chemicalAutos.forEach((chem, idx) => {
+        const li = document.createElement("li");
+        li.innerHTML = `
+          <span>${chem}</span>
+          <button class="btn btn-sm btn-danger" onclick="deleteChemicalAutoUI(${idx})"><i class="fas fa-trash"></i></button>
+        `;
+        list.appendChild(li);
+      });
+    }
+
+    function renderGrassType(plan) {
+      const treatments = plan.treatments.map((t, tIdx) => {
+        return `
+          <div class="treatment" data-treatment-id="${t.id}" draggable="true" ondragstart="dragStart(event)" ondragover="dragOver(event)" ondrop="dragDrop(event, ${plan.id})" ondragend="dragEnd(event)">
+            <div class="treatment-header">
+              <div class="treatment-title">
+                <i class="fas fa-arrows-alt"></i> Round ${t.number}
+                <small>(drag to reorder)</small>
+              </div>
+              <button class="btn btn-sm btn-danger" onclick="deleteTreatmentUI(${t.id})"><i class="fas fa-trash"></i></button>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Chemicals</label>
+              <select data-treatment-id="${t.id}" class="form-select" onchange="selectChemicalUI(this, ${t.id})">
+                <option value="">-- Add a chemical --</option>
+                ${config.chemicalAutos.map(c => `<option value="${c}">${c}</option>`).join("")}
+              </select>
+              <ul class="item-list" style="margin-top: 0.5rem;">
+                ${t.chems.map((c, cIdx) => `<li>${c}<button class="btn btn-sm btn-danger" onclick="deleteChemUI(${t.id}, ${cIdx})"><i class="fas fa-times"></i></button></li>`).join("")}
+              </ul>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Notes</label>
+              <input type="text"
+                     placeholder="Add a note + Enter"
+                     data-treatment-id="${t.id}"
+                     class="note-input form-input"
+                     onkeydown="addNoteUI(event, ${t.id})"/>
+              <ul class="item-list" style="margin-top: 0.5rem;">
+                ${t.notes.map((n, nIdx) => `<li>${n}<button class="btn btn-sm btn-danger" onclick="deleteNoteUI(${t.id}, ${nIdx})"><i class="fas fa-times"></i></button></li>`).join("")}
+              </ul>
+            </div>
+          </div>`;
+      }).join("");
+
+      return `
+        <div class="grass-type-section">
+          <div class="grass-type-header">
+            <div class="grass-type-name"><i class="fas fa-leaf"></i> ${plan.name}</div>
+            <button class="btn btn-sm btn-danger" onclick="deleteGrassTypeUI(${plan.id})"><i class="fas fa-trash"></i></button>
+          </div>
+          <button class="btn btn-primary" onclick="addTreatmentUI(${plan.id})" style="margin-bottom: 1rem;">
+            <i class="fas fa-plus"></i> Add Treatment
+          </button>
+          <div class="treatment-container">${treatments}</div>
+        </div>`;
+    }
+
+    function renderAll() {
+      const container = document.getElementById("grassTypesContainer");
+      container.innerHTML = "";
+      config.grassTypes.forEach(plan => {
+        const div = document.createElement("div");
+        div.innerHTML = renderGrassType(plan);
+        container.appendChild(div);
+      });
+      renderConditionList();
+      renderChemicalAutoList();
+    }
+
+    // ============ EVENT HANDLERS (UI) ============
+    document.getElementById("addGrassTypeBtn").addEventListener("click", async () => {
+      const input = document.getElementById("grassTypeInput");
+      const v = input.value.trim();
+      if (!v) return;
+
+      if (await createGrassType(v)) {
+        input.value = "";
+      }
+    });
+
+    document.getElementById("grassTypeInput").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        document.getElementById("addGrassTypeBtn").click();
+      }
+    });
+
+    function deleteGrassTypeUI(planId) {
+      if (confirm("Delete this grass type?")) {
+        deleteGrassTypeFromDB(planId);
+      }
+    }
+
+    function addTreatmentUI(planId) {
+      addTreatment(planId).catch(e => console.error("Error adding treatment:", e));
+    }
+
+    function deleteTreatmentUI(treatmentId) {
+      if (confirm("Delete this treatment?")) {
+        deleteTreatmentFromDB(treatmentId);
+      }
+    }
+
+    function selectChemicalUI(select, treatmentId) {
+      const chemical = select.value;
+      if (!chemical) return;
+      addChemicalToTreatment(treatmentId, chemical);
+      select.value = "";
+    }
+
+    function deleteChemUI(treatmentId, index) {
+      if (confirm("Delete this chemical?")) {
+        deleteChemicalFromTreatment(treatmentId, index);
+      }
+    }
+
+    function addNoteUI(event, treatmentId) {
+      if (event.key !== "Enter") return;
+      const input = event.target;
+      const note = input.value.trim();
+      if (!note) return;
+      addNoteToTreatment(treatmentId, note);
+      input.value = "";
+    }
+
+    function deleteNoteUI(treatmentId, index) {
+      if (confirm("Delete this note?")) {
+        deleteNoteFromTreatment(treatmentId, index);
+      }
+    }
+
+    document.getElementById("condInput").addEventListener("keydown", async (e) => {
+      if (e.key !== "Enter") return;
+      const v = e.target.value.trim();
+      if (!v) return;
+
+      if (await addConditionCode(v)) {
+        e.target.value = "";
+      }
+    });
+
+    function deleteConditionCodeUI(idx) {
+      const code = config.conditionCodes[idx];
+      if (confirm(`Delete condition code "${code}"?`)) {
+        const codeId = config.condCodeIds[code];
+        if (codeId !== undefined) {
+          deleteConditionCodeFromDB(codeId);
+        } else {
+          console.error("Code ID not found for:", code);
+        }
+      }
+    }
+
+    document.getElementById("chemAutoInput").addEventListener("keydown", async (e) => {
+      if (e.key !== "Enter") return;
+      const v = e.target.value.trim();
+      if (!v) return;
+
+      if (await addChemicalAuto(v)) {
+        e.target.value = "";
+      }
+    });
+
+    function deleteChemicalAutoUI(idx) {
+      const chem = config.chemicalAutos[idx];
+      if (confirm(`Delete chemical "${chem}"?`)) {
+        const chemId = config.chemAutoIds[chem];
+        if (chemId !== undefined) {
+          deleteChemicalAutoFromDB(chemId);
+        } else {
+          console.error("Chemical ID not found for:", chem);
+        }
+      }
+    }
+
+    // ============ DRAG AND DROP ============
+    let draggedElement = null;
+    let draggedSource = null;
+
+    function dragStart(event) {
+      draggedElement = event.target.closest(".treatment");
+      draggedSource = draggedElement;
+      draggedElement.classList.add("dragging");
+      event.dataTransfer.effectAllowed = "move";
+    }
+
+    function dragOver(event) {
+      event.preventDefault();
+      const treatment = event.target.closest(".treatment");
+      if (treatment && treatment !== draggedElement) {
+        treatment.classList.add("drag-over");
+      }
+      event.dataTransfer.dropEffect = "move";
+    }
+
+    function dragDrop(event, planId) {
+      event.preventDefault();
+      const targetTreatment = event.target.closest(".treatment");
+      
+      if (!targetTreatment || !draggedElement || draggedElement === targetTreatment) {
+        return;
+      }
+
+      // Get the container and all treatments
+      const container = targetTreatment.parentElement;
+      const treatments = Array.from(container.querySelectorAll(".treatment"));
+      
+      // Find indices
+      const dragIndex = treatments.indexOf(draggedSource);
+      const targetIndex = treatments.indexOf(targetTreatment);
+
+      if (dragIndex === -1 || targetIndex === -1) return;
+
+      // Reorder in DOM
+      if (dragIndex < targetIndex) {
+        targetTreatment.parentNode.insertBefore(draggedSource, targetTreatment.nextSibling);
+      } else {
+        targetTreatment.parentNode.insertBefore(draggedSource, targetTreatment);
+      }
+
+      // Update order values in database for all affected treatments
+      const reorderedTreatments = Array.from(container.querySelectorAll(".treatment"));
+      reorderedTreatments.forEach((t, idx) => {
+        const treatmentId = parseInt(t.getAttribute("data-treatment-id"), 10);
+        // Update the order in database
+        const formData = new FormData();
+        formData.append("new_order", idx);
+        fetch(`${API_BASE}/treatments/${treatmentId}/reorder`, {
+          method: "POST",
+          body: formData
+        }).catch(e => console.error("Reorder error:", e));
+      });
+
+      // Reload after a short delay to get fresh data
+      setTimeout(() => loadAllData(), 500);
+    }
+
+    function dragEnd(event) {
+      if (draggedElement) {
+        draggedElement.classList.remove("dragging");
+      }
+      // Remove drag-over class from all elements
+      document.querySelectorAll(".treatment.drag-over").forEach(el => {
+        el.classList.remove("drag-over");
+      });
+      draggedElement = null;
+      draggedSource = null;
+    }
+
+    // ============ OFFICE LOCATIONS MANAGEMENT ============
+    let locations = [];
+
+    async function loadLocations() {
+      try {
+        const res = await fetch(`${API_BASE}/locations`);
+        const data = await res.json();
+        locations = data.locations || [];
+        renderLocationsList();
+      } catch (e) {
+        console.error("Load locations error:", e);
+      }
+    }
+
+    function renderLocationsList() {
+      const container = document.getElementById("locationsList");
+      if (!locations || locations.length === 0) {
+        container.innerHTML = '<p style="color: #9ca3af;">No office locations added yet. Add one above to get started.</p>';
+        return;
+      }
+
+      container.innerHTML = locations.map(loc => `
+        <div class="location-card">
+          <div class="location-info">
+            <div class="location-name">${loc.name}</div>
+            ${loc.address ? `<div class="location-detail"><strong>Address:</strong> ${loc.address}</div>` : ''}
+            ${loc.service_area_zips ? `<div class="location-detail"><strong>Service Area:</strong> ${loc.service_area_zips}</div>` : ''}
+            ${loc.phone ? `<div class="location-detail"><strong>Phone:</strong> ${loc.phone}</div>` : ''}
+          </div>
+          <div class="location-actions">
+            <button class="btn btn-secondary btn-sm" onclick="editLocation(${loc.id})"><i class="fas fa-edit"></i> Edit</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteLocationUI(${loc.id})"><i class="fas fa-trash"></i> Delete</button>
+          </div>
+        </div>
+      `).join("");
+    }
+
+    async function addLocationUI() {
+      const name = document.getElementById("newLocName").value.trim();
+      const address = document.getElementById("newLocAddress").value.trim();
+      const zips = document.getElementById("newLocZips").value.trim();
+      const phone = document.getElementById("newLocPhone").value.trim();
+
+      if (!name) {
+        alert("Office location name is required");
+        return;
+      }
+
+      try {
+        const formData = new FormData();
+        formData.append("name", name);
+        formData.append("address", address);
+        formData.append("service_area_zips", zips);
+        formData.append("phone", phone);
+
+        const res = await fetch(`${API_BASE}/locations`, {
+          method: "POST",
+          body: formData
+        });
+        const data = await res.json();
+
+        if (data.status === "success") {
+          document.getElementById("newLocName").value = "";
+          document.getElementById("newLocAddress").value = "";
+          document.getElementById("newLocZips").value = "";
+          document.getElementById("newLocPhone").value = "";
+          await loadLocations();
+        } else {
+          alert("Error: " + data.message);
+        }
+      } catch (e) {
+        console.error("Add office location error:", e);
+        alert("Failed to add office location");
+      }
+    }
+
+    function editLocation(locId) {
+      const loc = locations.find(l => l.id === locId);
+      if (!loc) return;
+
+      const name = prompt("Office location name:", loc.name);
+      if (name === null) return;
+
+      const address = prompt("Address:", loc.address || "");
+      if (address === null) return;
+
+      const zips = prompt("Service area zip codes:", loc.service_area_zips || "");
+      if (zips === null) return;
+
+      const phone = prompt("Phone:", loc.phone || "");
+      if (phone === null) return;
+
+      updateLocationUI(locId, name, address, zips, phone);
+    }
+
+    async function updateLocationUI(locId, name, address, zips, phone) {
+      try {
+        const formData = new FormData();
+        formData.append("name", name);
+        formData.append("address", address);
+        formData.append("service_area_zips", zips);
+        formData.append("phone", phone);
+
+        const res = await fetch(`${API_BASE}/locations/${locId}`, {
+          method: "POST",
+          body: formData
+        });
+        const data = await res.json();
+
+        if (data.status === "success") {
+          await loadLocations();
+        } else {
+          alert("Error: " + data.message);
+        }
+      } catch (e) {
+        console.error("Update office location error:", e);
+        alert("Failed to update office location");
+      }
+    }
+
+    function deleteLocationUI(locId) {
+      if (confirm("Delete this office location? Make sure no customers are assigned to it first.")) {
+        deleteLocationFromDB(locId);
+      }
+    }
+
+    async function deleteLocationFromDB(locId) {
+      try {
+        const res = await fetch(`${API_BASE}/locations/${locId}`, {
+          method: "DELETE"
+        });
+        const data = await res.json();
+
+        if (data.status === "success") {
+          await loadLocations();
+        } else {
+          alert("Error: " + data.message);
+        }
+      } catch (e) {
+        console.error("Delete office location error:", e);
+        alert("Failed to delete office location");
+      }
+    }
+
+    // ============ TECHNICIANS MANAGEMENT ============
+    let technicians = [];
+
+    async function loadTechnicians() {
+      try {
+        const res = await fetch(`${API_BASE}/technicians`);
+        const data = await res.json();
+        technicians = data.technicians || [];
+        renderTechniciansList();
+        populateLocationSelects();
+      } catch (e) {
+        console.error("Load technicians error:", e);
+      }
+    }
+
+    function renderTechniciansList() {
+      const container = document.getElementById("techniciansList");
+      if (!technicians || technicians.length === 0) {
+        container.innerHTML = '<p style="color: #9ca3af;">No technicians added yet. Add one above to get started.</p>';
+        return;
+      }
+
+      container.innerHTML = technicians.map(tech => `
+        <div class="location-card">
+          <div class="location-info">
+            <div class="location-name" style="display: flex; align-items: center; gap: 0.5rem;">
+              <span style="width: 20px; height: 20px; background: ${tech.color_hex}; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 0 1px rgba(0,0,0,0.1);"></span>
+              ${tech.name}
+              ${!tech.is_active ? '<span style="background: #ef4444; color: white; padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem;">INACTIVE</span>' : ''}
+            </div>
+            <div class="location-detail"><strong>Office Location:</strong> ${tech.location_name}</div>
+            <div class="location-detail"><strong>Address:</strong> ${tech.location_address}</div>
+            <div class="location-detail"><strong>Profile Color:</strong> <span style="display: inline-block; width: 12px; height: 12px; background: ${tech.color_hex}; border-radius: 2px; vertical-align: middle;"></span> ${tech.color_hex}</div>
+          </div>
+          <div class="location-actions">
+            <button onclick="toggleTechnicianStatus(${tech.id})" class="btn btn-secondary" style="font-size: 0.8rem;">
+              <i class="fas fa-${tech.is_active ? 'pause' : 'play'}"></i> ${tech.is_active ? 'Deactivate' : 'Activate'}
+            </button>
+            <button onclick="editTechnician(${tech.id})" class="btn btn-secondary" style="font-size: 0.8rem;">
+              <i class="fas fa-edit"></i> Edit
+            </button>
+            <button onclick="deleteTechnician(${tech.id})" class="btn btn-danger" style="font-size: 0.8rem;">
+              <i class="fas fa-trash"></i> Delete
+            </button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function populateLocationSelects() {
+      const selects = ['newTechLocation', 'territoryLocation'];
+      selects.forEach(selectId => {
+        const select = document.getElementById(selectId);
+        if (select) {
+          // Save current selection
+          const currentValue = select.value;
+          
+          select.innerHTML = '<option value="">Select an office location...</option>';
+          locations.forEach(loc => {
+            select.innerHTML += `<option value="${loc.id}">${loc.name}</option>`;
+          });
+          
+          // Restore previous selection if it still exists
+          if (currentValue) {
+            const optionExists = Array.from(select.options).some(opt => opt.value === currentValue);
+            if (optionExists) {
+              select.value = currentValue;
+            }
+          }
+        }
+      });
+    }
+
+    function populateTechnicianSelect() {
+      const select = document.getElementById("drawingTechnician");
+      select.innerHTML = '<option value="">Select technician...</option>';
+
+      // Debug logging
+      console.log('=== POPULATE TECHNICIAN SELECT ===');
+      console.log('Technicians array:', technicians);
+      console.log('Technicians length:', technicians.length);
+      console.log('Selected location ID:', selectedLocationId);
+      console.log('Selected location ID type:', typeof selectedLocationId);
+
+      if (!technicians || technicians.length === 0) {
+        console.log('ERROR: No technicians loaded');
+        return;
+      }
+
+      // Filter technicians by selected location (convert both to numbers for comparison)
+      const selectedLocIdNum = parseInt(selectedLocationId);
+      const locationTechnicians = technicians.filter(t => {
+        const techLocId = parseInt(t.location_id);
+        const isMatch = techLocId === selectedLocIdNum && t.is_active;
+        console.log(`Tech ${t.name}: location_id=${techLocId}, selected=${selectedLocIdNum}, match=${isMatch}, active=${t.is_active}`);
+        return isMatch;
+      });
+      
+      console.log('Filtered technicians:', locationTechnicians);
+
+      if (locationTechnicians.length === 0) {
+        console.log('WARNING: No technicians match this location');
+        // Show all active technicians as fallback
+        const allActive = technicians.filter(t => t.is_active);
+        console.log('Showing all active technicians instead:', allActive);
+        allActive.forEach(tech => {
+          const option = document.createElement('option');
+          option.value = tech.id;
+          option.textContent = `${tech.name} (${tech.color_hex}) - Office Location: ${tech.location_name}`;
+          option.style.color = tech.color_hex;
+          select.appendChild(option);
+        });
+      } else {
+        locationTechnicians.forEach(tech => {
+          const option = document.createElement('option');
+          option.value = tech.id;
+          option.textContent = `${tech.name} (${tech.color_hex})`;
+          option.style.color = tech.color_hex;
+          select.appendChild(option);
+          console.log('Added option:', tech.name);
+        });
+      }
+    }
+
+    async function addTechnician() {
+      const name = document.getElementById("newTechName").value.trim();
+      const locationId = document.getElementById("newTechLocation").value;
+      const colorHex = document.getElementById("newTechColor").value;
+
+      if (!name || !locationId) {
+        alert("Please fill in all required fields");
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append("name", name);
+      formData.append("location_id", locationId);
+      formData.append("color_hex", colorHex);
+
+      try {
+        const res = await fetch(`${API_BASE}/technicians`, {
+          method: "POST",
+          body: formData
+        });
+        const data = await res.json();
+
+        if (data.status === "success") {
+          document.getElementById("newTechName").value = "";
+          document.getElementById("newTechLocation").value = "";
+          document.getElementById("newTechColor").value = "#3b82f6";
+          await loadTechnicians();
+          alert(data.message);
+        } else {
+          alert("Error: " + data.message);
+        }
+      } catch (e) {
+        console.error("Add technician error:", e);
+        alert("Failed to add technician");
+      }
+    }
+
+    async function toggleTechnicianStatus(techId) {
+      const tech = technicians.find(t => t.id === techId);
+      if (!tech) return;
+
+      const formData = new FormData();
+      formData.append("is_active", !tech.is_active);
+
+      try {
+        const res = await fetch(`${API_BASE}/technicians/${techId}`, {
+          method: "PUT",
+          body: formData
+        });
+        const data = await res.json();
+
+        if (data.status === "success") {
+          await loadTechnicians();
+        } else {
+          alert("Error: " + data.message);
+        }
+      } catch (e) {
+        console.error("Toggle technician status error:", e);
+        alert("Failed to update technician");
+      }
+    }
+
+    function editTechnician(techId) {
+      const tech = technicians.find(t => t.id === techId);
+      if (!tech) return;
+
+      const name = prompt("Technician name:", tech.name);
+      if (name === null) return;
+
+      const formData = new FormData();
+      if (name !== tech.name) formData.append("name", name);
+
+      // You could add more fields here for editing
+
+      if (formData.entries().next().done) {
+        alert("No changes made");
+        return;
+      }
+
+      updateTechnician(techId, formData);
+    }
+
+    async function updateTechnician(techId, formData) {
+      try {
+        const res = await fetch(`${API_BASE}/technicians/${techId}`, {
+          method: "PUT",
+          body: formData
+        });
+        const data = await res.json();
+
+        if (data.status === "success") {
+          await loadTechnicians();
+        } else {
+          alert("Error: " + data.message);
+        }
+      } catch (e) {
+        console.error("Update technician error:", e);
+        alert("Failed to update technician");
+      }
+    }
+
+    function deleteTechnician(techId) {
+      const tech = technicians.find(t => t.id === techId);
+      if (!tech) return;
+
+      if (confirm(`Delete technician "${tech.name}"? This action cannot be undone.`)) {
+        deleteTechnicianFromDB(techId);
+      }
+    }
+
+    async function deleteTechnicianFromDB(techId) {
+      try {
+        const res = await fetch(`${API_BASE}/technicians/${techId}`, {
+          method: "DELETE"
+        });
+        const data = await res.json();
+
+        if (data.status === "success") {
+          await loadTechnicians();
+        } else {
+          alert("Error: " + data.message);
+        }
+      } catch (e) {
+        console.error("Delete technician error:", e);
+        alert("Failed to delete technician");
+      }
+    }
+
+    async function autoAssignTerritories() {
+      const locationId = document.getElementById("territoryLocation").value;
+      if (!locationId) {
+        alert("Please select an office location first");
+        return;
+      }
+
+      if (confirm("This will create territories for all active technicians at this office location. Continue?")) {
+        try {
+          const formData = new FormData();
+          formData.append("location_id", locationId);
+          formData.append("radius", "15");
+
+          const res = await fetch(`${API_BASE}/technician_territories/auto_assign`, {
+            method: "POST",
+            body: formData
+          });
+          const data = await res.json();
+
+          if (data.status === "success") {
+            alert(data.message);
+            await loadTechnicians();
+          } else {
+            alert("Error: " + data.message);
+          }
+        } catch (e) {
+          console.error("Auto-assign territories error:", e);
+          alert("Failed to auto-assign territories");
+        }
+      }
+    }
+
+    async function unassignAllTerritories() {
+      const locationId = document.getElementById("territoryLocation").value;
+      if (!locationId) {
+        alert("Please select an office location first");
+        return;
+      }
+
+      const location = locations.find(l => l.id == locationId);
+      const locationName = location ? location.name : 'this office location';
+
+      if (confirm(`This will DELETE ALL territories for ${locationName}. This action cannot be undone. Continue?`)) {
+        try {
+          // Get all technicians for this office location
+          const response = await fetch(`${API_BASE}/technicians`);
+          const data = await response.json();
+          
+          if (data.status === 'success' && data.technicians) {
+            const locationTechs = data.technicians.filter(t => t.location_id == locationId);
+            
+            console.log(`Found ${locationTechs.length} technicians to unassign territories from`);
+            
+            // Delete each technician's territory
+            let deletedCount = 0;
+            let errorCount = 0;
+            for (const tech of locationTechs) {
+              try {
+                const delResponse = await fetch(`${API_BASE}/technician_territories/${tech.id}`, {
+                  method: "DELETE"
+                });
+                const delData = await delResponse.json();
+                console.log(`Delete territory for ${tech.name}:`, delData);
+                if (delData.status === 'success') {
+                  deletedCount++;
+                }
+              } catch (e) {
+                console.error(`Error deleting territory for ${tech.name}:`, e);
+                errorCount++;
+              }
+            }
+            
+            alert(`Deleted ${deletedCount} territories for ${locationName}.`);
+            await loadTechnicians();
+          }
+        } catch (e) {
+          console.error("Unassign territories error:", e);
+          alert("Failed to unassign territories: " + e.message);
+        }
+      }
+    }
+
+    // Geocoding helper function for service area map
+    function geocodeAddress(address) {
+      if (!address) return null;
+      const addressLower = address.toLowerCase().trim();
+      
+      if (addressLower.includes('keller') || addressLower.includes('egg farm')) {
+        return [32.9346, -97.2251];
+      } else if (addressLower.includes('dallas')) {
+        return [32.7767, -96.7970];
+      } else if (addressLower.includes('fort worth')) {
+        return [32.7555, -97.3308];
+      } else if (addressLower.includes('arlington')) {
+        return [32.7357, -97.1081];
+      } else if (addressLower.includes('plano')) {
+        return [33.0198, -96.6989];
+      }
+      return [32.9346, -97.2251]; // Default to Keller
+    }
+
+    // ============ TERRITORY DRAWING MODAL ============
+    let territoryMap = null;
+    let drawingLayer = null;
+    let existingTerritoriesLayer = null;
+    let dueCustomersLayer = null;
+    let currentDrawing = null;
+    let savedDrawings = {}; // Store drawings by technician ID
+    let isDrawing = false;
+    let selectedLocationId = null;
+    let selectedTechnician = null;
+
+    function openTerritoryModal() {
+      const locationId = document.getElementById("territoryLocation").value;
+      if (!locationId) {
+        alert("Please select an office location first");
+        return;
+      }
+      
+      selectedLocationId = locationId;
+      savedDrawings = {}; // Clear saved drawings when opening modal
+      document.getElementById("territoryModal").style.display = "flex";
+      
+      // Initialize map and populate dropdown
+      setTimeout(async () => {
+        // Clear previous map if exists
+        if (territoryMap) {
+          territoryMap.remove();
+          territoryMap = null;
+        }
+        
+        initializeTerritoryMap();
+        
+        // Load existing territories and due customers
+        await loadExistingTerritories();
+        await loadDueCustomersOnDrawingMap();
+        
+        // Ensure technicians data is loaded
+        await loadTechnicians();
+        
+        // Then populate dropdown
+        populateTechnicianSelect();
+      }, 100);
+    }
+
+    async function loadExistingTerritories() {
+      try {
+        // Add cache-busting to ensure fresh data
+        const cacheBuster = Date.now();
+        const response = await fetch(`${API_BASE}/technician_territories?_=${cacheBuster}`);
+        const data = await response.json();
+        
+        if (data.status === 'success' && data.territories) {
+          data.territories.forEach(territory => {
+            let layer = null;
+            
+            // Check if territory has polygon coordinates
+            if (territory.polygon_coords) {
+              try {
+                const coords = JSON.parse(territory.polygon_coords);
+                if (coords && coords.length >= 3) {
+                  // Draw existing territory
+                  layer = L.polygon(coords, {
+                    color: territory.color_hex,
+                    fillColor: territory.color_hex,
+                    fillOpacity: 0.2,
+                    weight: 2,
+                    dashArray: '5, 5',
+                    interactive: false  // Non-clickable
+                  }).addTo(existingTerritoriesLayer);
+                }
+              } catch (e) {
+                console.log('Error parsing polygon for', territory.technician_name);
+              }
+            } else {
+              // Draw circle for auto-assigned territories (non-interactive)
+              layer = L.circle([territory.center_lat, territory.center_lng], {
+                radius: territory.radius_miles * 1609.34,
+                color: territory.color_hex,
+                fillColor: territory.color_hex,
+                fillOpacity: 0.2,
+                weight: 2,
+                dashArray: '5, 5',
+                interactive: false  // Non-clickable
+              }).addTo(existingTerritoriesLayer);
+            }
+            
+            // Store technician ID on the layer so we can hide it when drawing
+            if (layer) {
+              layer.technicianId = territory.technician_id;
+              
+              // Add technician name label at the center of the territory
+              const center = layer.getBounds().getCenter();
+              const labelIcon = L.divIcon({
+                className: 'territory-label',
+                html: `<div style="
+                  font-size: 11px;
+                  font-weight: 600;
+                  color: ${territory.color_hex};
+                  background: rgba(255,255,255,0.6);
+                  padding: 2px 6px;
+                  border-radius: 3px;
+                  white-space: nowrap;
+                  pointer-events: none;
+                  text-shadow: 0 0 2px white;
+                ">${territory.technician_name}</div>`,
+                iconSize: null,
+                iconAnchor: [0, 0]
+              });
+              
+              const labelMarker = L.marker(center, {
+                icon: labelIcon,
+                interactive: false,
+                zIndexOffset: 1000
+              }).addTo(existingTerritoriesLayer);
+              
+              labelMarker.technicianId = territory.technician_id;
+            }
+          });
+          
+          console.log(`Loaded ${data.territories.length} territories on map`);
+        } else {
+          console.log('No territories to display');
+        }
+      } catch (e) {
+        console.error('Error loading existing territories:', e);
+      }
+    }
+
+    async function loadDueCustomersOnDrawingMap() {
+      try {
+        // Get customers who are due for service
+        const response = await fetch(`${API_BASE}/customers`);
+        const data = await response.json();
+        
+        if (data.customers && data.customers.length > 0) {
+          const now = new Date();
+          
+          // Customers are arrays like routing.html: [name, address, phone, sqft, price, cost, notes, last_service_date, status, id, lat, lng, days_since]
+          // Indexes: 0=name, 1=address, 2=phone, 3=sqft, 7=last_service_date, 8=status, 9=id, 10=lat, 11=lng
+          const dueCustomers = data.customers.filter(c => {
+            const status = c[8]; // "due" or "not_due"
+            const lastService = c[7]; // last_service_date
+            if (!lastService) return true;
+            const lastDate = new Date(lastService);
+            const daysSince = (now - lastDate) / (1000 * 60 * 60 * 24);
+            return daysSince >= 45;
+          });
+          
+          let pinsAdded = 0;
+          dueCustomers.forEach(customer => {
+            const lat = customer[10];
+            const lng = customer[11];
+            
+            if (lat != null && lng != null && !isNaN(lat) && !isNaN(lng)) {
+              L.circleMarker([lat, lng], {
+                radius: 4,
+                fillColor: '#ef4444',
+                color: '#dc2626',
+                weight: 1,
+                opacity: 1,
+                fillOpacity: 0.9,
+                interactive: false  // Non-clickable, no popup
+              }).addTo(dueCustomersLayer);
+              pinsAdded++;
+            }
+          });
+          
+          console.log(`Added ${pinsAdded} red pins to map`);
+        } else {
+          console.log('No customers data available');
+        }
+      } catch (e) {
+        console.error('Error loading due customers:', e);
+      }
+    }
+
+    function closeTerritoryModal() {
+      document.getElementById("territoryModal").style.display = "none";
+      if (territoryMap) {
+        territoryMap.remove();
+        territoryMap = null;
+      }
+      isDrawing = false;
+      currentDrawing = null;
+      savedDrawings = {};
+      selectedTechnician = null;
+    }
+
+    function initializeTerritoryMap() {
+      // Get location coordinates
+      const location = locations.find(l => l.id == selectedLocationId);
+      if (!location) return;
+
+      // Initialize Leaflet map
+      territoryMap = L.map('territoryMap').setView([32.9346, -97.2251], 12); // Keller coordinates
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+      }).addTo(territoryMap);
+
+      // Add location marker (non-interactive, no popup)
+      const locationCoords = geocodeAddress(location.address || '');
+      if (locationCoords) {
+        L.marker(locationCoords, {
+          interactive: false,  // Non-clickable, doesn't interfere with cursor
+          icon: L.divIcon({
+            className: 'home-location',
+            html: `<div style="
+              background: #dc2626;
+              color: white;
+              border-radius: 50%;
+              width: 30px;
+              height: 30px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              font-weight: bold;
+              font-size: 12px;
+              border: 3px solid white;
+              box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            ">🏠</div>`,
+            iconSize: [30, 30],
+            iconAnchor: [15, 15]
+          })
+        }).addTo(territoryMap);
+      }
+
+      // Add drawing layer for new territory
+      drawingLayer = L.layerGroup().addTo(territoryMap);
+      
+      // Add layer for existing territories
+      existingTerritoriesLayer = L.layerGroup().addTo(territoryMap);
+      
+      // Add layer for due customers
+      dueCustomersLayer = L.layerGroup().addTo(territoryMap);
+
+      // Add click handler for drawing (only when not clicking markers)
+      territoryMap.on('click', function(e) {
+        // Check if click was on a marker
+        if (e.originalEvent.target.classList.contains('leaflet-marker-icon') || 
+            e.originalEvent.target.closest('.leaflet-marker-icon')) {
+          return; // Don't draw when clicking markers
+        }
+        handleMapClick(e);
+      });
+    }
+
+    function startDrawing() {
+      const technicianId = document.getElementById("drawingTechnician").value;
+      if (!technicianId) {
+        alert("Please select a technician first");
+        return;
+      }
+
+      selectedTechnician = technicians.find(t => t.id == technicianId);
+      if (!selectedTechnician) return;
+
+      isDrawing = true;
+      currentDrawing = [];
+      
+      // Clear any previous drawing for this technician
+      drawingLayer.clearLayers();
+      
+      // Hide the selected technician's existing territory from the map
+      existingTerritoriesLayer.eachLayer(layer => {
+        if (layer.technicianId == selectedTechnician.id) {
+          existingTerritoriesLayer.removeLayer(layer);
+        }
+      });
+
+      // Update UI
+      document.getElementById("startDrawingBtn").disabled = true;
+      document.getElementById("drawingStatus").style.display = "block";
+
+      // Force cursor change using CSS on the map container
+      const mapDiv = document.getElementById('territoryMap');
+      mapDiv.style.cursor = 'crosshair';
+      
+      // Also set Leaflet's interactive cursor
+      if (territoryMap) {
+        territoryMap.getContainer().style.cursor = 'crosshair';
+      }
+    }
+
+    function redrawSavedDrawing() {
+      // Clear current drawing layer
+      drawingLayer.clearLayers();
+      
+      if (!currentDrawing || currentDrawing.length === 0) return;
+      
+      // Redraw points
+      currentDrawing.forEach((point, index) => {
+        L.circleMarker(point, {
+          radius: 5,
+          fillColor: selectedTechnician.color_hex,
+          color: selectedTechnician.color_hex,
+          weight: 2,
+          opacity: 1,
+          fillOpacity: 0.8
+        }).addTo(drawingLayer);
+      });
+      
+      // Redraw lines
+      if (currentDrawing.length > 1) {
+        L.polyline(currentDrawing, {
+          color: selectedTechnician.color_hex,
+          weight: 3,
+          opacity: 0.8,
+          dashArray: '5, 10'
+        }).addTo(drawingLayer);
+      }
+      
+      // If complete polygon (3+ points and closed), fill it
+      if (currentDrawing.length >= 3) {
+        // Check if it's closed (first point close to last)
+        const first = currentDrawing[0];
+        const last = currentDrawing[currentDrawing.length - 1];
+        const distance = Math.sqrt(
+          Math.pow(last[0] - first[0], 2) + Math.pow(last[1] - first[1], 2)
+        );
+        
+        if (distance < 0.01 || currentDrawing.length > 3) {
+          L.polygon(currentDrawing, {
+            color: selectedTechnician.color_hex,
+            fillColor: selectedTechnician.color_hex,
+            fillOpacity: 0.3,
+            weight: 3
+          }).addTo(drawingLayer);
+        }
+      }
+    }
+
+    function handleMapClick(e) {
+      if (!isDrawing || !selectedTechnician) return;
+
+      const lat = e.latlng.lat;
+      const lng = e.latlng.lng;
+
+      currentDrawing.push([lat, lng]);
+
+      // Add marker
+      const marker = L.circleMarker([lat, lng], {
+        radius: 5,
+        fillColor: selectedTechnician.color_hex,
+        color: selectedTechnician.color_hex,
+        weight: 2,
+        opacity: 1,
+        fillOpacity: 0.8
+      }).addTo(drawingLayer);
+
+      // Draw lines between points
+      if (currentDrawing.length > 1) {
+        const polyline = L.polyline(currentDrawing, {
+          color: selectedTechnician.color_hex,
+          weight: 3,
+          opacity: 0.8,
+          dashArray: '5, 10'
+        }).addTo(drawingLayer);
+      }
+
+      // Close polygon if we have 3+ points and click near the first point
+      if (currentDrawing.length >= 3) {
+        const firstPoint = currentDrawing[0];
+        const distance = Math.sqrt(
+          Math.pow(lat - firstPoint[0], 2) + Math.pow(lng - firstPoint[1], 2)
+        );
+
+        if (distance < 0.01) { // Close to starting point
+          finishDrawing();
+        }
+      }
+    }
+
+    async function finishDrawing() {
+      if (currentDrawing.length < 3) {
+        alert("You need at least 3 points to create a territory");
+        return;
+      }
+
+      isDrawing = false;
+
+      // Create filled polygon
+      const polygon = L.polygon(currentDrawing, {
+        color: selectedTechnician.color_hex,
+        fillColor: selectedTechnician.color_hex,
+        fillOpacity: 0.3,
+        weight: 3
+      }).addTo(drawingLayer);
+
+      // Update UI
+      document.getElementById("startDrawingBtn").disabled = false;
+      document.getElementById("drawingStatus").style.display = "none";
+      document.getElementById('territoryMap').style.cursor = 'default';
+
+      // Auto-save the territory
+      await autoSaveTerritory();
+    }
+
+    async function autoSaveTerritory() {
+      if (!currentDrawing || currentDrawing.length < 3) {
+        alert("Please draw a valid territory first");
+        return;
+      }
+
+      if (!selectedTechnician) {
+        alert("Please select a technician first");
+        return;
+      }
+
+      try {
+        // Calculate center of polygon
+        const centerLat = currentDrawing.reduce((sum, point) => sum + point[0], 0) / currentDrawing.length;
+        const centerLng = currentDrawing.reduce((sum, point) => sum + point[1], 0) / currentDrawing.length;
+
+        // Calculate approximate radius (distance from center to farthest point)
+        let maxDistance = 0;
+        currentDrawing.forEach(point => {
+          const distance = Math.sqrt(
+            Math.pow(point[0] - centerLat, 2) + Math.pow(point[1] - centerLng, 2)
+          );
+          maxDistance = Math.max(maxDistance, distance);
+        });
+        const radiusMiles = maxDistance * 69; // Convert degrees to miles (approximate)
+
+        // Save to database
+        const formData = new FormData();
+        formData.append("technician_id", selectedTechnician.id);
+        formData.append("territory_name", `${selectedTechnician.name} Custom Territory`);
+        formData.append("center_lat", centerLat);
+        formData.append("center_lng", centerLng);
+        formData.append("radius_miles", radiusMiles);
+        formData.append("polygon_coords", JSON.stringify(currentDrawing));
+
+        const res = await fetch(`${API_BASE}/technician_territories/custom`, {
+          method: "POST",
+          body: formData
+        });
+
+        const data = await res.json();
+
+        if (data.status === "success") {
+          alert(`Territory saved for ${selectedTechnician.name}!`);
+          // Reset for next technician instead of closing modal
+          resetForNextTechnician();
+          await loadTechnicians(); // Refresh the list
+        } else {
+          alert("Error: " + data.message);
+        }
+      } catch (e) {
+        console.error("Save territory error:", e);
+        alert("Failed to save territory");
+      }
+    }
+
+    function resetForNextTechnician() {
+      // Clear the current drawing
+      drawingLayer.clearLayers();
+      currentDrawing = null;
+      isDrawing = false;
+      
+      // Reset UI for selecting next technician
+      document.getElementById("startDrawingBtn").disabled = false;
+      document.getElementById("drawingStatus").style.display = "none";
+      document.getElementById('territoryMap').style.cursor = 'default';
+      
+      // Reset technician dropdown
+      document.getElementById("drawingTechnician").value = "";
+      selectedTechnician = null;
+      
+      // Reload existing territories to show the one we just saved
+      existingTerritoriesLayer.clearLayers();
+      loadExistingTerritories();
+      
+      // Keep modal open - user can select another technician and draw again
+    }
+
+    // ============ TAB SWITCHING ============
+    document.getElementById("tab-treatments").addEventListener("click", () => {
+      document.getElementById("treatments").classList.add("active");
+      document.getElementById("locations").classList.remove("active");
+      document.getElementById("tab-treatments").classList.add("active");
+      document.getElementById("tab-locations").classList.remove("active");
+      document.getElementById("tab-technicians").classList.remove("active");
+    });
+
+    document.getElementById("tab-locations").addEventListener("click", () => {
+      document.getElementById("treatments").classList.remove("active");
+      document.getElementById("locations").classList.add("active");
+      document.getElementById("technicians").classList.remove("active");
+      document.getElementById("tab-treatments").classList.remove("active");
+      document.getElementById("tab-locations").classList.add("active");
+      document.getElementById("tab-technicians").classList.remove("active");
+      loadLocations();
+    });
+
+    document.getElementById("tab-technicians").addEventListener("click", () => {
+      document.getElementById("treatments").classList.remove("active");
+      document.getElementById("locations").classList.remove("active");
+      document.getElementById("technicians").classList.add("active");
+      document.getElementById("tab-treatments").classList.remove("active");
+      document.getElementById("tab-locations").classList.remove("active");
+      document.getElementById("tab-technicians").classList.add("active");
+      loadLocations().then(() => loadTechnicians());
+    });
+
+    document.getElementById("addLocationBtn").addEventListener("click", addLocationUI);
+    document.getElementById("addTechnicianBtn").addEventListener("click", addTechnician);
+    document.getElementById("autoAssignTerritoriesBtn").addEventListener("click", autoAssignTerritories);
+    document.getElementById("unassignTerritoriesBtn").addEventListener("click", unassignAllTerritories);
+    document.getElementById("drawTerritoriesBtn").addEventListener("click", openTerritoryModal);
+    document.getElementById("startDrawingBtn").addEventListener("click", startDrawing);
+
+    // ============ INIT ============
+    loadAllData();
+    loadLocations();
+    loadTechnicians();
+  </script>
+</body>
+</html>

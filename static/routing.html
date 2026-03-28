@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Routing – Lawn Care CRM</title>
+
+    <!-- Leaflet CSS -->
+    <link
+        rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+        crossorigin=""
+    />
+
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+
+    <style>
+    :root {
+        --primary: #2563eb;
+        --primary-dark: #1d4ed8;
+        --primary-light: #dbeafe;
+        --secondary: #64748b;
+        --accent: #0f172a;
+        --light: #f8fafc;
+        --dark: #1e293b;
+        --white: #ffffff;
+        --gray-50: #f8fafc;
+        --gray-100: #f1f5f9;
+        --gray-200: #e2e8f0;
+        --gray-300: #cbd5e1;
+        --gray-400: #94a3b8;
+        --gray-500: #64748b;
+        --gray-600: #475569;
+        --gray-700: #334155;
+        --gray-800: #1e293b;
+        --gray-900: #0f172a;
+        --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+        --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    }
+
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
+
+    body {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+        min-height: 100vh;
+        color: var(--gray-800);
+        line-height: 1.6;
+    }
+
+    .container {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 2rem;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+    }
+
+    .header {
+        background: var(--white);
+        padding: 2.5rem;
+        border-radius: 20px;
+        box-shadow: var(--shadow-xl);
+        text-align: center;
+        border: 1px solid var(--gray-200);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .header::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: linear-gradient(90deg, var(--primary), var(--primary-dark));
+    }
+
+    .header h1 {
+        font-size: 2.5rem;
+        font-weight: 700;
+        background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        margin-bottom: 0.75rem;
+        letter-spacing: -0.025em;
+    }
+
+    .header p {
+        color: var(--gray-600);
+        font-size: 1.1rem;
+        font-weight: 400;
+        max-width: 600px;
+        margin: 0 auto;
+    }
+
+    /* Layout: map on left, due list on right */
+    .routing-layout {
+        display: flex;
+        gap: 1.5rem;
+        flex: 1;
+        min-height: 50vh;
+    }
+
+    /* Map container with fixed height */
+    .map-container {
+        flex: 2;
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: var(--shadow-xl);
+        border: 1px solid var(--gray-200);
+        position: relative;
+        background: var(--white);
+    }
+
+    .map-viewport {
+        width: 100%;
+        height: 600px;
+        border-radius: 16px;
+        overflow: hidden;
+    }
+
+    #map {
+        width: 100%;
+        height: 100%;
+    }
+
+    /* Right bar: one panel only */
+    .right-panel {
+        flex: 1;
+        max-width: 380px;
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+    }
+
+    /* Customers Due Soon list on the right */
+    .due-list {
+        background: var(--white);
+        padding: 1.75rem;
+        border-radius: 16px;
+        box-shadow: var(--shadow-xl);
+        border: 1px solid var(--gray-200);
+        position: relative;
+    }
+
+    .due-list::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: linear-gradient(90deg, var(--primary), var(--primary-dark));
+        border-radius: 16px 16px 0 0;
+    }
+
+    .due-list h3 {
+        font-size: 1.25rem;
+        font-weight: 600;
+        margin-bottom: 1.25rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: var(--gray-800);
+    }
+
+    .customer-due-row {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 1rem;
+        border-radius: 12px;
+        margin-bottom: 0.75rem;
+        background: var(--gray-50);
+        border: 1px solid var(--gray-200);
+        transition: all 0.2s ease;
+    }
+
+    .customer-due-row:hover {
+        background: var(--primary-light);
+        border-color: var(--primary);
+        transform: translateY(-1px);
+        box-shadow: var(--shadow-md);
+    }
+
+    .customer-due-row label {
+        flex: 1;
+        cursor: pointer;
+    }
+
+    .days-since {
+        font-size: 0.875rem;
+        color: var(--gray-500);
+        font-weight: 500;
+    }
+
+    /* Build Route button */
+    .build-route-btn {
+        margin-top: 1.5rem;
+        width: 100%;
+        padding: 1rem;
+        font-size: 1rem;
+        font-weight: 600;
+        background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+        color: var(--white);
+        border: none;
+        border-radius: 12px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        box-shadow: var(--shadow-md);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .build-route-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-lg);
+        background: linear-gradient(135deg, var(--primary-dark), var(--primary));
+    }
+
+    .build-route-btn:active {
+        transform: translateY(0);
+        box-shadow: var(--shadow-md);
+    }
+
+    /* Custom marker style for blue non‑due pins */
+    .custom-marker {
+        background: none !important;
+        border: none !important;
+    }
+</style>
+</head>
+<body>
+    <nav style="position: sticky; top: 0; background: white; z-index: 100; padding: 1rem 0; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05); margin-bottom: 1.5rem;">
+        <div style="max-width: 1400px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; padding: 0 2rem;">
+            <div style="display: flex; align-items: center; gap: 2rem;">
+                <a href="/" style="text-decoration: none; color: inherit; font-size: 1.5rem; font-weight: 800; color: var(--primary);"><i class="fas fa-leaf"></i> LawnOps</a>
+                <div style="display: flex; gap: 2rem; font-size: 1rem;">
+                    <a href="/" style="text-decoration: none; color: inherit; display: flex; align-items: center; gap: 0.5rem;"><i class="fas fa-home" style="color: var(--primary);"></i> Dashboard</a>
+                    <a href="/routing.html" style="text-decoration: none; color: inherit; display: flex; align-items: center; gap: 0.5rem;"><i class="fas fa-route" style="color: var(--primary);"></i> Routing</a>
+                    <a href="/analytics" style="text-decoration: none; color: inherit; display: flex; align-items: center; gap: 0.5rem;"><i class="fas fa-chart-line" style="color: var(--primary);"></i> Analytics</a>
+                </div>
+            </div>
+            <div style="display: flex; gap: 1rem; align-items: center; font-size: 0.9rem; color: var(--secondary);">
+                <button class="btn btn-primary" onclick="fetchCustomers()" style="padding: 0.5rem 1rem; font-size: 0.875rem; background: var(--primary); color: white; border: none; border-radius: 8px; cursor: pointer; transition: all 0.2s ease;">
+                    <i class="fas fa-sync-alt"></i> Refresh
+                </button>
+                <span id="lastSync" style="opacity: 0.7;">Live</span>
+                <a href="/owner" class="btn btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.875rem; background: var(--secondary); color: white; text-decoration: none; border-radius: 8px;">Admin</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="header">
+            <h1><i class="fas fa-route"></i> Intelligent Route Planning</h1>
+            <p>AI-powered route optimization and predictive scheduling for maximum efficiency</p>
+        </div>
+
+        <!-- Control Panel -->
+        <div class="control-panel" style="background: var(--white); padding: 1.5rem; border-radius: 16px; box-shadow: var(--shadow-lg); margin-bottom: 1.5rem;">
+            <div style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
+                <button id="optimizeBtn" class="btn btn-primary" style="background: linear-gradient(135deg, var(--primary), var(--primary-dark));">
+                    <i class="fas fa-magic"></i> Optimize Routes (30 Days)
+                </button>
+                <button id="showClustersBtn" class="btn btn-secondary" style="background: var(--secondary); color: white;">
+                    <i class="fas fa-map-marked-alt"></i> Show Clusters
+                </button>
+                <button id="hideClustersBtn" class="btn btn-secondary" style="background: var(--gray-500); color: white; display: none;">
+                    <i class="fas fa-eye-slash"></i> Hide Clusters
+                </button>
+                <div style="margin-left: auto; display: flex; gap: 0.5rem; align-items: center;">
+                    <span style="font-size: 0.9rem; color: var(--gray-600);">Optimization Status:</span>
+                    <span id="optimizationStatus" style="padding: 0.25rem 0.75rem; background: var(--gray-100); border-radius: 20px; font-size: 0.85rem; color: var(--gray-600);">Not Optimized</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Metrics Dashboard -->
+        <div class="metrics-dashboard" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+            <div class="metric-card" style="background: var(--white); padding: 1rem; border-radius: 12px; box-shadow: var(--shadow); border-left: 4px solid var(--primary);">
+                <div style="font-size: 0.85rem; color: var(--gray-600);">Customers Scheduled</div>
+                <div id="scheduledCount" style="font-size: 1.5rem; font-weight: 700; color: var(--primary);">0</div>
+            </div>
+            <div class="metric-card" style="background: var(--white); padding: 1rem; border-radius: 12px; box-shadow: var(--shadow); border-left: 4px solid var(--success);">
+                <div style="font-size: 0.85rem; color: var(--gray-600);">Total Distance</div>
+                <div id="totalDistance" style="font-size: 1.5rem; font-weight: 700; color: var(--success);">0 mi</div>
+            </div>
+            <div class="metric-card" style="background: var(--white); padding: 1rem; border-radius: 12px; box-shadow: var(--shadow); border-left: 4px solid var(--warning);">
+                <div style="font-size: 0.85rem; color: var(--gray-600);">Service Time</div>
+                <div id="serviceTime" style="font-size: 1.5rem; font-weight: 700; color: var(--warning);">0 hrs</div>
+            </div>
+            <div class="metric-card" style="background: var(--white); padding: 1rem; border-radius: 12px; box-shadow: var(--shadow); border-left: 4px solid var(--accent);">
+                <div style="font-size: 0.85rem; color: var(--gray-600);">Fuel Cost</div>
+                <div id="fuelCost" style="font-size: 1.5rem; font-weight: 700; color: var(--accent);">$0</div>
+            </div>
+        </div>
+
+        <div class="routing-layout">
+            <div class="map-container">
+                <div class="map-viewport">
+                    <div id="map"></div>
+                </div>
+            </div>
+
+            <div class="right-panel">
+                <!-- Customers Due Soon list only -->
+                <div class="due-list" id="dueList">
+                    <h3>
+                        <i class="fas fa-exclamation-triangle"></i>
+                        Customers Due Soon (<span id="dueCount">0</span>)
+                    </h3>
+                    <p id="dueEmpty">Loading customers…</p>
+                    <div id="dueCustomers"></div>
+                    <button id="buildRoute" class="build-route-btn">
+                        <i class="fas fa-route"></i> Build Route from Selected
+                    </button>
+                </div>
+
+                <!-- Customers Not Due Yet list -->
+                <div class="due-list" id="notDueList">
+                    <h3>
+                        <i class="fas fa-clock"></i>
+                        Customers Not Due Yet 
+                    </h3>
+                    <p id="notDueEmpty">No customers not due yet.</p>
+                    <div id="notDueCustomers"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script
+        src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+        crossorigin="">
+    </script>
+
+    <script>
+        // Initialize Leaflet map
+        const map = L.map('map').setView([32.84, -97.19], 12);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+        }).addTo(map);
+
+        // Global variables for optimization
+        let clusterMarkers = [];
+        let routeMarkers = [];
+        let currentSchedule = null;
+        let clusterData = null;
+        let territoryMarkers = [];
+        let technicianData = null;
+
+        // 🧠 SaaS Route Optimization Functions
+        async function optimizeRoutes() {
+            const optimizeBtn = document.getElementById('optimizeBtn');
+            const statusEl = document.getElementById('optimizationStatus');
+            
+            optimizeBtn.disabled = true;
+            optimizeBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Optimizing...';
+            statusEl.textContent = 'Optimizing...';
+            statusEl.style.background = '#fef3c7';
+            statusEl.style.color = '#92400e';
+            
+            try {
+                const res = await fetch("/optimize_routes", {method: "POST"});
+                const data = await res.json();
+                
+                if (data.status === 'success') {
+                    currentSchedule = data.data;
+                    updateMetrics(data.data.metrics);
+                    statusEl.textContent = 'Optimized';
+                    statusEl.style.background = '#dcfce7';
+                    statusEl.style.color = '#166534';
+                    
+                    // Show success message
+                    showNotification('Routes optimized successfully!', 'success');
+                    
+                    // Refresh customer data to show updated schedule
+                    await fetchCustomers();
+                } else {
+                    throw new Error(data.message);
+                }
+            } catch (error) {
+                console.error('Optimization error:', error);
+                statusEl.textContent = 'Error';
+                statusEl.style.background = '#fee2e2';
+                statusEl.style.color = '#dc2626';
+                showNotification('Optimization failed: ' + error.message, 'error');
+            } finally {
+                optimizeBtn.disabled = false;
+                optimizeBtn.innerHTML = '<i class="fas fa-magic"></i> Optimize Routes (30 Days)';
+            }
+        }
+
+        async function showClusters() {
+            const showBtn = document.getElementById('showClustersBtn');
+            const hideBtn = document.getElementById('hideClustersBtn');
+            
+            showBtn.disabled = true;
+            showBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
+            
+            try {
+                const res = await fetch("/route_clusters");
+                const data = await res.json();
+                
+                if (data.status === 'success') {
+                    clusterData = data.clusters;
+                    displayClusters(data.clusters);
+                    
+                    showBtn.style.display = 'none';
+                    hideBtn.style.display = 'inline-block';
+                    
+                    showNotification(`Found ${data.total_clusters} geographic clusters`, 'success');
+                } else {
+                    throw new Error(data.message);
+                }
+            } catch (error) {
+                console.error('Cluster error:', error);
+                showNotification('Failed to load clusters: ' + error.message, 'error');
+            } finally {
+                showBtn.disabled = false;
+                showBtn.innerHTML = '<i class="fas fa-map-marked-alt"></i> Show Clusters';
+            }
+        }
+
+        function hideClusters() {
+            // Remove all cluster markers
+            clusterMarkers.forEach(marker => map.removeLayer(marker));
+            clusterMarkers = [];
+            
+            const showBtn = document.getElementById('showClustersBtn');
+            const hideBtn = document.getElementById('hideClustersBtn');
+            
+            showBtn.style.display = 'inline-block';
+            hideBtn.style.display = 'none';
+        }
+
+        function displayClusters(clusters) {
+            // Clear existing cluster markers
+            clusterMarkers.forEach(marker => map.removeLayer(marker));
+            clusterMarkers = [];
+            
+            // Color palette for clusters
+            const colors = ['#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#ec4899', '#06b6d4'];
+            
+            Object.entries(clusters).forEach(([clusterId, cluster], index) => {
+                const color = colors[index % colors.length];
+                
+                // Add cluster center marker
+                const centerMarker = L.circleMarker([cluster.center.lat, cluster.center.lng], {
+                    radius: 15,
+                    fillColor: color,
+                    color: '#ffffff',
+                    weight: 2,
+                    opacity: 0.8,
+                    fillOpacity: 0.3
+                }).addTo(map);
+                
+                centerMarker.bindPopup(`
+                    <div style="text-align: center;">
+                        <strong>${clusterId}</strong><br>
+                        <span style="color: ${color};">●</span> ${cluster.customer_count} customers
+                    </div>
+                `);
+                
+                clusterMarkers.push(centerMarker);
+                
+                // Add customer markers in cluster
+                cluster.customers.forEach(customer => {
+                    const customerMarker = L.circleMarker([customer.lat, customer.lng], {
+                        radius: 8,
+                        fillColor: color,
+                        color: '#ffffff',
+                        weight: 2,
+                        opacity: 0.9,
+                        fillOpacity: 0.7
+                    }).addTo(map);
+                    
+                    customerMarker.bindPopup(`
+                        <div>
+                            <strong>${customer.name}</strong><br>
+                            ${customer.address}<br>
+                            <span style="color: ${color};">●</span> ${clusterId}<br>
+                            Priority: ${customer.priority_score.toFixed(1)}
+                        </div>
+                    `);
+                    
+                    clusterMarkers.push(customerMarker);
+                });
+            });
+        }
+
+        function updateMetrics(metrics) {
+            document.getElementById('scheduledCount').textContent = metrics.total_customers;
+            document.getElementById('totalDistance').textContent = `${metrics.total_distance} mi`;
+            document.getElementById('serviceTime').textContent = `${Math.round(metrics.total_time / 60)} hrs`;
+            document.getElementById('fuelCost').textContent = `$${metrics.fuel_cost_estimate.toFixed(2)}`;
+        }
+
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 1rem 1.5rem;
+                border-radius: 8px;
+                color: white;
+                font-weight: 500;
+                z-index: 10000;
+                animation: slideIn 0.3s ease;
+                max-width: 300px;
+            `;
+            
+            switch(type) {
+                case 'success':
+                    notification.style.background = '#10b981';
+                    break;
+                case 'error':
+                    notification.style.background = '#ef4444';
+                    break;
+                default:
+                    notification.style.background = '#3b82f6';
+            }
+            
+            notification.textContent = message;
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.style.animation = 'slideOut 0.3s ease';
+                setTimeout(() => document.body.removeChild(notification), 300);
+            }, 3000);
+        }
+
+        // 🔧 Technician Territory Visualization
+        async function loadTechnicianTerritories() {
+            try {
+                const response = await fetch("http://localhost:8000/technician_territories");
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    technicianData = data.territories;
+                    displayTerritories(data.territories);
+                }
+            } catch (error) {
+                console.error('Error loading territories:', error);
+            }
+        }
+
+        function displayTerritories(territories) {
+            // Clear existing territory markers
+            territoryMarkers.forEach(marker => map.removeLayer(marker));
+            territoryMarkers = [];
+            
+            territories.forEach(territory => {
+                let layer = null;
+                
+                // Check if territory has polygon coordinates (drawn territories)
+                if (territory.polygon_coords) {
+                    try {
+                        const coords = JSON.parse(territory.polygon_coords);
+                        if (coords && coords.length >= 3) {
+                            // Draw polygon territory
+                            layer = L.polygon(coords, {
+                                color: territory.color_hex,
+                                fillColor: territory.color_hex,
+                                fillOpacity: 0.15,
+                                weight: 2,
+                                opacity: 0.4,
+                                dashArray: '5, 5'
+                            }).addTo(map);
+                            
+                            layer.bindPopup(`
+                                <div style="text-align: center;">
+                                    <strong>${territory.technician_name}</strong><br>
+                                    <span style="color: ${territory.color_hex};">●</span> Custom Territory
+                                </div>
+                            `);
+                        }
+                    } catch (e) {
+                        console.log('Error parsing polygon for', territory.technician_name);
+                    }
+                }
+                
+                // If no polygon, use circle (auto-assigned territories)
+                if (!layer) {
+                    layer = L.circle([territory.center_lat, territory.center_lng], {
+                        radius: territory.radius_miles * 1609.34, // Convert miles to meters
+                        fillColor: territory.color_hex,
+                        color: territory.color_hex,
+                        weight: 2,
+                        opacity: 0.3,
+                        fillOpacity: 0.1
+                    }).addTo(map);
+                    
+                    layer.bindPopup(`
+                        <div style="text-align: center;">
+                            <strong>${territory.technician_name}</strong><br>
+                            <span style="color: ${territory.color_hex};">●</span> ${territory.territory_name}<br>
+                            <small>${territory.radius_miles} mile radius</small>
+                        </div>
+                    `);
+                }
+                
+                territoryMarkers.push(layer);
+            });
+        }
+
+        function hideTerritories() {
+            territoryMarkers.forEach(marker => map.removeLayer(marker));
+            territoryMarkers = [];
+        }
+
+        // Add territory controls to the control panel
+        function addTerritoryControls() {
+            const controlPanel = document.querySelector('.control-panel');
+            const territoryControls = document.createElement('div');
+            territoryControls.style.cssText = `
+                margin-top: 1rem;
+                padding-top: 1rem;
+                border-top: 1px solid rgba(0,0,0,0.1);
+                display: flex;
+                gap: 0.5rem;
+                align-items: center;
+                flex-wrap: wrap;
+            `;
+            
+            territoryControls.innerHTML = `
+                <button id="showTerritoriesBtn" class="btn btn-secondary" style="background: var(--accent); color: white;">
+                    <i class="fas fa-map-marked-alt"></i> Show Territories
+                </button>
+                <button id="hideTerritoriesBtn" class="btn btn-secondary" style="background: var(--gray-500); color: white; display: none;">
+                    <i class="fas fa-eye-slash"></i> Hide Territories
+                </button>
+                <div style="margin-left: auto; display: flex; gap: 0.5rem; align-items: center;">
+                    <span style="font-size: 0.9rem; color: var(--text-secondary);">Technician Zones:</span>
+                    <span id="territoryStatus" style="padding: 0.25rem 0.75rem; background: var(--gray-100); border-radius: 20px; font-size: 0.85rem; color: var(--gray-600);">Hidden</span>
+                </div>
+            `;
+            
+            controlPanel.appendChild(territoryControls);
+            
+            // Add event listeners
+            document.getElementById('showTerritoriesBtn').addEventListener('click', async () => {
+                await loadTechnicianTerritories();
+                document.getElementById('showTerritoriesBtn').style.display = 'none';
+                document.getElementById('hideTerritoriesBtn').style.display = 'inline-block';
+                document.getElementById('territoryStatus').textContent = 'Visible';
+                document.getElementById('territoryStatus').style.background = '#dcfce7';
+                document.getElementById('territoryStatus').style.color = '#166534';
+            });
+            
+            document.getElementById('hideTerritoriesBtn').addEventListener('click', () => {
+                hideTerritories();
+                document.getElementById('showTerritoriesBtn').style.display = 'inline-block';
+                document.getElementById('hideTerritoriesBtn').style.display = 'none';
+                document.getElementById('territoryStatus').textContent = 'Hidden';
+                document.getElementById('territoryStatus').style.background = '#fee2e2';
+                document.getElementById('territoryStatus').style.color = '#dc2626';
+            });
+        }
+
+        // Event listeners
+        document.getElementById('optimizeBtn').addEventListener('click', optimizeRoutes);
+        document.getElementById('showClustersBtn').addEventListener('click', showClusters);
+        document.getElementById('hideClustersBtn').addEventListener('click', hideClusters);
+
+        // Initialize territory controls when page loads
+        addTerritoryControls();
+
+        // Add CSS animations
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes slideIn {
+                from { transform: translateX(100%); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+            }
+            @keyframes slideOut {
+                from { transform: translateX(0); opacity: 1; }
+                to { transform: translateX(100%); opacity: 0; }
+            }
+        `;
+        document.head.appendChild(style);
+
+        // Fetch ALL customers and add a pin for each one (blue or red if due)
+        async function fetchCustomers() {
+            try {
+                const res = await fetch("/customers");
+                if (!res.ok) throw new Error("API error: " + res.status);
+
+                const data = await res.json();
+                const customers = data.customers || [];
+
+                console.log("ALL customers (will all get pins):", customers);
+
+                // Clear any existing markers
+                map.eachLayer(layer => {
+                    if (layer instanceof L.Marker) {
+                        map.removeLayer(layer);
+                    }
+                });
+
+                // Update the "due" list UI (still only due ones)
+                const dueCount = document.getElementById("dueCount");
+                const dueCustomersContainer = document.getElementById("dueCustomers");
+                const dueEmpty = document.getElementById("dueEmpty");
+
+                const due = customers.filter(c => c[8] === "due");
+                dueCount.textContent = due.length;
+
+                if (due.length === 0) {
+                    dueEmpty.textContent = "No customers are due service right now.";
+                    dueCustomersContainer.innerHTML = "";
+                } else {
+                    dueEmpty.remove();
+                    dueCustomersContainer.innerHTML = due.map((c) => {
+                        const name    = c[0];
+                        const address = c[1];
+                        const sqft    = c[3];
+                        const rowid   = c[9];
+
+                        return `
+                            <div class="customer-due-row">
+                                <input type="checkbox" id="customer-${rowid}" data-rowid="${rowid}" data-sqft="${sqft}">
+                                <label for="customer-${rowid}">
+                                    <strong>${name}</strong><br>
+                                    <span>${address}</span>
+                                </label>
+                                <span class="days-since">
+                                    ${sqft.toLocaleString()} sqft
+                                </span>
+                            </div>
+                        `;
+                    }).join("");
+                }
+
+                // Update the "not due" list UI
+                const notDueCustomersContainer = document.getElementById("notDueCustomers");
+                const notDueEmpty = document.getElementById("notDueEmpty");
+
+                const notDue = customers.filter(c => c[8] !== "due");
+
+                if (notDue.length === 0) {
+                    notDueEmpty.textContent = "No customers not due yet.";
+                    notDueCustomersContainer.innerHTML = "";
+                } else {
+                    notDueEmpty.remove();
+                    notDueCustomersContainer.innerHTML = notDue.map((c) => {
+                        const name    = c[0];
+                        const address = c[1];
+                        const sqft    = c[3];
+                        const rowid   = c[9];
+
+                        return `
+                            <div class="customer-due-row">
+                                <input type="checkbox" id="customer-${rowid}" data-rowid="${rowid}" data-sqft="${sqft}">
+                                <label for="customer-${rowid}">
+                                    <strong>${name}</strong><br>
+                                    <span>${address}</span>
+                                </label>
+                                <span class="days-since">
+                                    ${sqft.toLocaleString()} sqft
+                                </span>
+                            </div>
+                        `;
+                    }).join("");
+                }
+
+                // Add a pin for EVERY customer (blue by default, red if due)
+                customers.forEach((c) => {
+                    const name    = c[0];
+                    const address = c[1];
+                    const sqft    = c[3];
+                    const rowid   = c[9];
+                    const lat     = c[10];
+                    const lng     = c[11];
+                    const status  = c[8]; // "due" or "not_due"
+
+                    console.log("Adding pin for", name, "at", [lat, lng], "status:", status);
+
+                    if (lat == null || lng == null || isNaN(lat) || isNaN(lng)) {
+                        console.warn("Invalid coordinates for", name, lat, lng);
+                        return;
+                    }
+
+                    // BUT: if the customer is "due", make the pin red; otherwise blue
+                    const isDue = status === "due";
+                    const color = isDue ? '#ef4444' : '#3b82f6';
+                    const icon = L.divIcon({
+                        className: "custom-marker",
+                        html: `<div style="
+                            background: ${color};
+                            width: 10px; height: 10px;
+                            border-radius: 50%;
+                            border: 2px solid #ffffff;
+                            box-shadow: 0 0 4px rgba(0,0,0,0.3);
+                        "></div>`,
+                        iconSize: [10, 10],
+                        iconAnchor: [5, 5]
+                    });
+
+                    const marker = L.marker([lat, lng], { icon }).addTo(map);
+
+                    const popupContent = `
+                        <div>
+                            <strong>${name}</strong><br>
+                            ${address}<br>
+                            ${sqft.toLocaleString()} sqft<br>
+                            Status: ${status}
+                        </div>
+                    `;
+                    marker.bindPopup(popupContent);
+
+                    // Optional: click toggles checklist checkbox
+                    marker.on("click", () => {
+                        const cb = document.getElementById(`customer-${rowid}`);
+                        if (cb) cb.checked = !cb.checked;
+                    });
+                });
+
+            } catch (e) {
+                console.error("Error fetching customers or adding markers:", e);
+                const dueEmpty = document.getElementById("dueEmpty");
+                if (dueEmpty) {
+                    dueEmpty.textContent = "Error loading customers.";
+                }
+            }
+        }
+
+        // Build Route from selected customers - FIXED
+        function setupBuildRouteButton() {
+            const btn = document.getElementById("buildRoute");
+
+            btn.addEventListener("click", async () => {
+                const selected = Array.from(document.querySelectorAll('input[type="checkbox"]:checked')).reverse().map(cb => ({
+                    rowid: parseInt(cb.dataset.rowid), 
+                    sqft: parseInt(cb.dataset.sqft)
+                }));
+                if (selected.length > 0) {
+                    await fetch("/build_route", {method: "POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({route:selected})});
+                }
+                window.location.href = "/Route_Printing.html";
+            });
+        }
+
+        // Initialize on page load
+        fetchCustomers();
+        setupBuildRouteButton();
+    </script>
+</body>
+</html>
