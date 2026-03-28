@@ -794,49 +794,10 @@
       </div>
     </div>
   </div>
-      const error = document.getElementById('adminError');
-      
-      console.log('Input element:', input);
-      console.log('Gate element:', gate);
-      console.log('Input value:', input ? input.value : 'null');
-      console.log('Expected key:', ADMIN_KEY);
-      
-      if (!input || !gate) {
-        console.error('Required elements not found!');
-        return;
-      }
-      
-      if (input.value === ADMIN_KEY) {
-        console.log('Key matched! Hiding gate...');
-        // Admin gate - unlocked in memory only (resets on page refresh/close)
-    let adminUnlocked = false;
-    
-    function checkAdminKey() {
-        const input = document.getElementById('adminKeyInput').value;
-        if (input === ADMIN_KEY) {
-            adminUnlocked = true;
-            document.getElementById('adminGate').style.display = 'none';
-        } else {
-            document.getElementById('adminError').style.display = 'block';
-            document.getElementById('adminKeyInput').value = '';
-            document.getElementById('adminKeyInput').focus();
-        }
-    }
-    
-    // Show gate on load
-    document.getElementById('adminGate').style.display = 'flex';
-        sessionStorage.setItem('adminAuthenticated', 'true');
-        gate.style.display = 'none';
-        console.log('Gate hidden');
-      } else {
-        console.log('Key did not match');
-        if (error) error.style.display = 'block';
-        input.value = '';
-        input.focus();
-      }
-    }
+  <script>
+    const API_BASE = "";
 
-    // Allow Enter key to submit
+    // Allow Enter key to submit admin key form
     document.getElementById('adminKeyInput').addEventListener('keydown', function(e) {
       if (e.key === 'Enter') {
         checkAdminKey();
