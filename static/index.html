@@ -910,23 +910,6 @@
                         if (savedData.points && savedData.points.length >= 3) {
                             console.log('Loading', savedData.points.length, 'saved points');
                             
-                            // Add pagination controls
-                const totalPages = Math.ceil(filtered.length / CUSTOMERS_PER_PAGE);
-                if (totalPages > 1) {
-                    list.innerHTML += `
-                        <div class="pagination" style="display: flex; justify-content: center; gap: 1rem; margin-top: 2rem; padding: 1rem;">
-                            <button class="btn btn-secondary" ${currentPage === 1 ? 'disabled' : ''} onclick="changePage(${currentPage - 1})">
-                                ← Previous
-                            </button>
-                            <span style="padding: 0.5rem; font-weight: 600;">
-                                Page ${currentPage} of ${totalPages} (${filtered.length} customers)
-                            </span>
-                            <button class="btn btn-secondary" ${currentPage === totalPages ? 'disabled' : ''} onclick="changePage(${currentPage + 1})">
-                                Next →
-                            </button>
-                        </div>
-                    `;
-                }
                             // Load saved points
                             measurePoints = savedData.points;
                             
