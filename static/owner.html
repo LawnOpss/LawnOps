@@ -65,12 +65,18 @@
     }
 
     .navbar-content {
-      max-width: 1600px;
+      max-width: 1400px;
       margin: 0 auto;
       padding: 0 2rem;
       display: flex;
       justify-content: space-between;
       align-items: center;
+    }
+
+    .navbar-left {
+      display: flex;
+      align-items: center;
+      gap: 2rem;
     }
 
     .navbar-brand {
@@ -563,15 +569,24 @@
   <!-- NAVBAR -->
   <nav class="navbar">
     <div class="navbar-content">
-      <a href="/" class="navbar-brand">
-        <i class="fas fa-leaf"></i> LawnOps
-      </a>
-      <ul class="navbar-nav">
-        <li><a href="/"><i class="fas fa-home"></i> Dashboard</a></li>
-        <li><a href="/owner"><i class="fas fa-cog"></i> Admin</a></li>
-        <li><a href="/routing.html"><i class="fas fa-route"></i> Routing</a></li>
-        <li><a href="/analytics"><i class="fas fa-chart-line"></i> Analytics</a></li>
-      </ul>
+      <div class="navbar-left">
+        <a href="/" class="navbar-brand">
+          <i class="fas fa-leaf"></i> LawnOps
+        </a>
+        <ul class="navbar-nav">
+          <li><a href="/"><i class="fas fa-home"></i> Dashboard</a></li>
+          <li><a href="/routing.html"><i class="fas fa-route"></i> Routing</a></li>
+          <li><a href="/analytics"><i class="fas fa-chart-line"></i> Analytics</a></li>
+        </ul>
+      </div>
+      <div id="userDisplay" style="display: flex; align-items: center; gap: 0.75rem; margin-left: auto; padding-left: 1.5rem; border-left: 1px solid var(--border-color);">
+        <div style="text-align: right;">
+          <div id="userName" style="font-weight: 600; color: var(--text-primary); font-size: 0.9rem;"></div>
+          <div id="userLocation" style="font-size: 0.75rem; color: var(--text-secondary);"></div>
+        </div>
+        <i class="fas fa-user-circle" style="font-size: 1.5rem; color: var(--primary);"></i>
+        <a href="/logout" style="color: var(--text-secondary); text-decoration: none; font-size: 0.85rem;" title="Logout"><i class="fas fa-sign-out-alt"></i></a>
+      </div>
     </div>
   </nav>
 
@@ -592,6 +607,9 @@
       </button>
       <button id="tab-technicians" class="tab-btn" data-tab="technicians">
         <i class="fas fa-user-hard-hat"></i> Technicians
+      </button>
+      <button id="tab-office" class="tab-btn" data-tab="office">
+        <i class="fas fa-user-tie"></i> Office
       </button>
     </div>
 
@@ -754,6 +772,54 @@
             <i class="fas fa-list"></i> Technicians
           </h3>
           <div id="techniciansList" style="display: grid; gap: 1rem;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== OFFICE WORKERS TAB ==================== -->
+    <div id="office" class="tab-content">
+      <div class="card">
+        <div class="section-header">
+          <h2 class="section-title"><i class="fas fa-user-tie"></i> Office Staff Management</h2>
+        </div>
+        <p style="color: var(--text-secondary); margin: 0 0 1.5rem 0;">Add and manage office workers. Assign them to office locations and set their login credentials. Workers use their username/password to log into the system.</p>
+
+        <!-- Add Office Worker Form -->
+        <div class="form-panel">
+          <h3><i class="fas fa-plus-circle"></i> Add New Office Worker</h3>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Full Name *</label>
+              <input type="text" id="newWorkerName" class="form-input" placeholder="e.g. Jane Smith" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Office Location *</label>
+              <select id="newWorkerLocation" class="form-input">
+                <option value="">Select a location...</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Username *</label>
+              <input type="text" id="newWorkerUsername" class="form-input" placeholder="e.g. jsmith" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Password *</label>
+              <input type="password" id="newWorkerPassword" class="form-input" placeholder="Min 6 characters" />
+            </div>
+          </div>
+          <button id="addOfficeWorkerBtn" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Add Office Worker
+          </button>
+        </div>
+
+        <!-- Office Workers List -->
+        <div style="margin-top: 2rem;">
+          <h3 style="margin-bottom: 1rem; color: var(--text-primary);">
+            <i class="fas fa-list"></i> Office Staff
+          </h3>
+          <div id="officeWorkersList" style="display: grid; gap: 1rem;"></div>
         </div>
       </div>
     </div>
@@ -2291,12 +2357,160 @@
       // Reset technician dropdown
       document.getElementById("drawingTechnician").value = "";
       selectedTechnician = null;
-      
       // Reload existing territories to show the one we just saved
       existingTerritoriesLayer.clearLayers();
       loadExistingTerritories();
       
       // Keep modal open - user can select another technician and draw again
+    }
+
+    // ============ OFFICE WORKERS MANAGEMENT ============
+    let officeWorkers = [];
+
+    async function loadOfficeWorkers() {
+      try {
+        const res = await fetch(`${API_BASE}/office-workers`);
+        const data = await res.json();
+        officeWorkers = data.office_workers || [];
+        renderOfficeWorkersList();
+      } catch (e) {
+        console.error("Load office workers error:", e);
+      }
+    }
+
+    function renderOfficeWorkersList() {
+      const container = document.getElementById("officeWorkersList");
+      if (!officeWorkers || officeWorkers.length === 0) {
+        container.innerHTML = '<p style="color: #9ca3af;">No office workers added yet. Add one above to get started.</p>';
+        return;
+      }
+
+      container.innerHTML = officeWorkers.map(worker => `
+        <div class="location-card">
+          <div class="location-info">
+            <div class="location-name">${worker.name}</div>
+            <div class="location-detail"><strong>Username:</strong> ${worker.username}</div>
+            <div class="location-detail"><strong>Location:</strong> ${worker.location_name || 'Unknown'}</div>
+            <div class="location-detail"><strong>Status:</strong> ${worker.is_active ? '<span style="color: var(--success);">Active</span>' : '<span style="color: var(--error);">Inactive</span>'}</div>
+          </div>
+          <div class="location-actions">
+            <button class="btn btn-secondary btn-sm" onclick="toggleOfficeWorkerStatus(${worker.id})">${worker.is_active ? 'Deactivate' : 'Activate'}</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteOfficeWorker(${worker.id})"><i class="fas fa-trash"></i> Delete</button>
+          </div>
+        </div>
+      `).join("");
+    }
+
+    async function populateOfficeWorkerLocations() {
+      const select = document.getElementById("newWorkerLocation");
+      select.innerHTML = '<option value="">Select a location...</option>';
+      
+      try {
+        const res = await fetch(`${API_BASE}/locations`);
+        const data = await res.json();
+        const locations = data.locations || [];
+        
+        locations.forEach(loc => {
+          const option = document.createElement("option");
+          option.value = loc.id;
+          option.textContent = loc.name;
+          select.appendChild(option);
+        });
+      } catch (e) {
+        console.error("Load locations for office worker error:", e);
+      }
+    }
+
+    async function addOfficeWorker() {
+      const name = document.getElementById("newWorkerName").value.trim();
+      const locationId = document.getElementById("newWorkerLocation").value;
+      const username = document.getElementById("newWorkerUsername").value.trim();
+      const password = document.getElementById("newWorkerPassword").value;
+
+      if (!name || !locationId || !username || !password) {
+        alert("All fields are required");
+        return;
+      }
+
+      if (password.length < 6) {
+        alert("Password must be at least 6 characters");
+        return;
+      }
+
+      try {
+        const formData = new FormData();
+        formData.append("name", name);
+        formData.append("location_id", locationId);
+        formData.append("username", username);
+        formData.append("password", password);
+
+        const res = await fetch(`${API_BASE}/office-workers`, {
+          method: "POST",
+          body: formData
+        });
+        const data = await res.json();
+
+        if (data.status === "success") {
+          document.getElementById("newWorkerName").value = "";
+          document.getElementById("newWorkerLocation").value = "";
+          document.getElementById("newWorkerUsername").value = "";
+          document.getElementById("newWorkerPassword").value = "";
+          await loadOfficeWorkers();
+        } else {
+          alert("Error: " + data.message);
+        }
+      } catch (e) {
+        console.error("Add office worker error:", e);
+        alert("Failed to add office worker");
+      }
+    }
+
+    async function toggleOfficeWorkerStatus(workerId) {
+      const worker = officeWorkers.find(w => w.id === workerId);
+      if (!worker) return;
+
+      const formData = new FormData();
+      formData.append("is_active", !worker.is_active);
+
+      try {
+        const res = await fetch(`${API_BASE}/office-workers/${workerId}`, {
+          method: "POST",
+          body: formData
+        });
+        const data = await res.json();
+
+        if (data.status === "success") {
+          await loadOfficeWorkers();
+        } else {
+          alert("Error: " + data.message);
+        }
+      } catch (e) {
+        console.error("Toggle office worker status error:", e);
+        alert("Failed to update office worker");
+      }
+    }
+
+    async function deleteOfficeWorker(workerId) {
+      const worker = officeWorkers.find(w => w.id === workerId);
+      if (!worker) return;
+
+      if (confirm(`Delete office worker "${worker.name}"? This action cannot be undone.`)) {
+        try {
+          const res = await fetch(`${API_BASE}/office-workers/${workerId}`, {
+            method: "DELETE"
+          });
+          const data = await res.json();
+
+          if (data.status === "success") {
+            await loadOfficeWorkers();
+          } else {
+            alert("Error: " + data.message);
+          }
+        } catch (e) {
+          console.error("Delete office worker error:", e);
+          alert("Failed to delete office worker");
+        }
+      }
     }
 
     // ============ TAB SWITCHING ============
@@ -2315,6 +2529,7 @@
       document.getElementById("tab-treatments").classList.remove("active");
       document.getElementById("tab-locations").classList.add("active");
       document.getElementById("tab-technicians").classList.remove("active");
+      document.getElementById("tab-office").classList.remove("active");
       loadLocations();
     });
 
@@ -2322,23 +2537,69 @@
       document.getElementById("treatments").classList.remove("active");
       document.getElementById("locations").classList.remove("active");
       document.getElementById("technicians").classList.add("active");
+      document.getElementById("office").classList.remove("active");
       document.getElementById("tab-treatments").classList.remove("active");
       document.getElementById("tab-locations").classList.remove("active");
       document.getElementById("tab-technicians").classList.add("active");
+      document.getElementById("tab-office").classList.remove("active");
       loadLocations().then(() => loadTechnicians());
+    });
+
+    document.getElementById("tab-office").addEventListener("click", () => {
+      document.getElementById("treatments").classList.remove("active");
+      document.getElementById("locations").classList.remove("active");
+      document.getElementById("technicians").classList.remove("active");
+      document.getElementById("office").classList.add("active");
+      document.getElementById("tab-treatments").classList.remove("active");
+      document.getElementById("tab-locations").classList.remove("active");
+      document.getElementById("tab-technicians").classList.remove("active");
+      document.getElementById("tab-office").classList.add("active");
+      populateOfficeWorkerLocations();
+      loadOfficeWorkers();
     });
 
     document.getElementById("addLocationBtn").addEventListener("click", addLocationUI);
     document.getElementById("addTechnicianBtn").addEventListener("click", addTechnician);
+    document.getElementById("addOfficeWorkerBtn").addEventListener("click", addOfficeWorker);
     document.getElementById("autoAssignTerritoriesBtn").addEventListener("click", autoAssignTerritories);
     document.getElementById("unassignTerritoriesBtn").addEventListener("click", unassignAllTerritories);
     document.getElementById("drawTerritoriesBtn").addEventListener("click", openTerritoryModal);
     document.getElementById("startDrawingBtn").addEventListener("click", startDrawing);
 
+    // ============ CURRENT USER DISPLAY ============
+    async function loadCurrentUser() {
+      try {
+        const res = await fetch(`${API_BASE}/me`);
+        const data = await res.json();
+        
+        if (data.authenticated) {
+          const userNameEl = document.getElementById("userName");
+          const userLocationEl = document.getElementById("userLocation");
+          
+          if (data.user_type === 'admin') {
+            userNameEl.textContent = 'Admin';
+            userLocationEl.textContent = data.username || '';
+          } else if (data.user_type === 'office_worker') {
+            userNameEl.textContent = data.worker_name || data.username;
+            // Fetch location name
+            const locRes = await fetch(`${API_BASE}/locations`);
+            const locData = await locRes.json();
+            const location = locData.locations?.find(l => l.id === data.location_id);
+            userLocationEl.textContent = location?.name || '';
+          }
+        }
+      } catch (e) {
+        console.error("Load current user error:", e);
+      }
+    }
+
     // ============ INIT ============
     loadAllData();
     loadLocations();
     loadTechnicians();
+    populateOfficeWorkerLocations();
+    loadOfficeWorkers();
+    loadCurrentUser();
   </script>
 </body>
 </html>

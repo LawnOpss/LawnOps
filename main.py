@@ -526,6 +526,20 @@ CREATE TABLE IF NOT EXISTS service_visits (
 )
 """)
 
+# 🏢 OFFICE WORKERS TABLE
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS office_workers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    location_id INTEGER NOT NULL,
+    username TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (location_id) REFERENCES locations (id) ON DELETE CASCADE
+)
+""")
+
 conn.commit()
 
 # Add order column to treatments if missing
@@ -1057,11 +1071,33 @@ async def login_page(request: Request, error: str = None):
 
 @app.post("/login")
 async def do_login(request: Request, username: str = Form(...), password: str = Form(...)):
-    """Process login form"""
+    """Process login form - check hardcoded admin OR office_workers DB"""
+    import hashlib
+    
+    # Check hardcoded admin credentials first
     if username == USERNAME and password == PASSWORD:
         request.session['logged_in'] = True
         request.session['username'] = username
+        request.session['user_type'] = 'admin'
         return RedirectResponse(url="/", status_code=302)
+    
+    # Check office_workers database
+    password_hash = hashlib.sha256(password.encode()).hexdigest()
+    cursor.execute(
+        "SELECT id, name, location_id, is_active FROM office_workers WHERE username = ? AND password_hash = ? AND is_active = 1",
+        (username, password_hash)
+    )
+    row = cursor.fetchone()
+    
+    if row:
+        request.session['logged_in'] = True
+        request.session['username'] = username
+        request.session['user_type'] = 'office_worker'
+        request.session['worker_id'] = row[0]
+        request.session['worker_name'] = row[1]
+        request.session['location_id'] = row[2]
+        return RedirectResponse(url="/", status_code=302)
+    
     return RedirectResponse(url="/login?error=Invalid+credentials", status_code=302)
 
 @app.get("/logout")
@@ -1074,6 +1110,27 @@ async def logout(request: Request):
 async def check_auth(request: Request):
     """API endpoint to check if user is logged in"""
     return {"authenticated": request.session.get('logged_in', False)}
+
+@app.get("/me")
+async def get_current_user(request: Request):
+    """Get current logged-in user info"""
+    if not request.session.get('logged_in'):
+        return {"authenticated": False}
+    
+    user_type = request.session.get('user_type', 'unknown')
+    username = request.session.get('username', '')
+    
+    response = {
+        "authenticated": True,
+        "user_type": user_type,
+        "username": username
+    }
+    
+    if user_type == 'office_worker':
+        response['worker_name'] = request.session.get('worker_name', '')
+        response['location_id'] = request.session.get('location_id')
+    
+    return response
 
 # Protected routes - all redirect to /login if not authenticated
 
@@ -1660,6 +1717,9 @@ def delete_technician(technician_id: int):
 def get_technician_territories():
     """Get all technician territories for map visualization"""
     try:
+        # Use the correct database file
+        conn = sqlite3.connect('database.db')
+        cursor = conn.cursor()
         cursor.execute("""
             SELECT tt.id, tt.technician_id, tt.territory_name, tt.center_lat, tt.center_lng,
                    tt.radius_miles, tt.polygon_coords, t.name as technician_name, t.color_hex
@@ -1668,6 +1728,7 @@ def get_technician_territories():
             WHERE t.is_active = 1
         """)
         territories = cursor.fetchall()
+        conn.close()
         
         result = []
         for territory in territories:
@@ -2236,6 +2297,124 @@ def delete_location(location_id: int):
         return {"status": "error", "message": str(e)}
 
 
+# ========== OFFICE WORKERS ENDPOINTS ==========
+
+@app.get("/office-workers")
+def get_office_workers():
+    """Get all office workers with their location info"""
+    try:
+        cursor.execute("""
+            SELECT ow.id, ow.name, ow.location_id, ow.username, ow.is_active, ow.created_at,
+                   l.name as location_name
+            FROM office_workers ow
+            JOIN locations l ON ow.location_id = l.id
+            ORDER BY ow.name ASC
+        """)
+        rows = cursor.fetchall()
+        workers = []
+        for row in rows:
+            workers.append({
+                "id": row[0],
+                "name": row[1],
+                "location_id": row[2],
+                "username": row[3],
+                "is_active": bool(row[4]),
+                "created_at": row[5],
+                "location_name": row[6]
+            })
+        return {"office_workers": workers}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@app.post("/office-workers")
+def create_office_worker(
+    name: str = Form(...),
+    location_id: int = Form(...),
+    username: str = Form(...),
+    password: str = Form(...)
+):
+    """Create a new office worker"""
+    try:
+        import hashlib
+        password_hash = hashlib.sha256(password.encode()).hexdigest()
+        
+        cursor.execute("""
+            INSERT INTO office_workers (name, location_id, username, password_hash, is_active)
+            VALUES (?, ?, ?, ?, ?)
+        """, (name, location_id, username, password_hash, True))
+        conn.commit()
+        worker_id = cursor.lastrowid
+        return {"status": "success", "id": worker_id, "message": f"Office worker '{name}' created"}
+    except sqlite3.IntegrityError:
+        return {"status": "error", "message": "Username already exists"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@app.post("/office-workers/{worker_id}")
+def update_office_worker(
+    worker_id: int,
+    name: str = Form(None),
+    location_id: int = Form(None),
+    username: str = Form(None),
+    password: str = Form(None),
+    is_active: bool = Form(None)
+):
+    """Update an office worker"""
+    try:
+        updates = []
+        params = []
+        
+        if name is not None:
+            updates.append("name = ?")
+            params.append(name)
+        if location_id is not None:
+            updates.append("location_id = ?")
+            params.append(location_id)
+        if username is not None:
+            updates.append("username = ?")
+            params.append(username)
+        if password is not None:
+            import hashlib
+            password_hash = hashlib.sha256(password.encode()).hexdigest()
+            updates.append("password_hash = ?")
+            params.append(password_hash)
+        if is_active is not None:
+            updates.append("is_active = ?")
+            params.append(is_active)
+        
+        if not updates:
+            return {"status": "error", "message": "No updates provided"}
+        
+        params.append(worker_id)
+        cursor.execute(f"UPDATE office_workers SET {', '.join(updates)} WHERE id = ?", params)
+        conn.commit()
+        
+        if cursor.rowcount > 0:
+            return {"status": "success", "message": "Office worker updated"}
+        else:
+            return {"status": "error", "message": "Office worker not found"}
+    except sqlite3.IntegrityError:
+        return {"status": "error", "message": "Username already exists"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@app.delete("/office-workers/{worker_id}")
+def delete_office_worker(worker_id: int):
+    """Delete an office worker"""
+    try:
+        cursor.execute("DELETE FROM office_workers WHERE id = ?", (worker_id,))
+        conn.commit()
+        if cursor.rowcount > 0:
+            return {"status": "success", "message": "Office worker deleted"}
+        else:
+            return {"status": "error", "message": "Office worker not found"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
 # ========== SERVICE VISITS ENDPOINTS ==========
 
 @app.get("/service-visits")
@@ -2470,4 +2649,75 @@ def get_condition_trends(location_id: int = None):
         })
     return {"trends": trends}
 
+
+@app.get("/analytics/office-dashboard")
+def get_office_dashboard(request: Request, days: int = 30):
+    """Get office worker dashboard metrics for their assigned location"""
+    if not request.session.get('logged_in'):
+        return {"error": "Not authenticated"}
     
+    user_type = request.session.get('user_type')
+    location_id = request.session.get('location_id')
+    
+    # Admin can optionally filter by location, office worker sees their location only
+    if user_type == 'office_worker' and not location_id:
+        return {"error": "No location assigned"}
+    
+    target_location = location_id if user_type == 'office_worker' else request.query_params.get('location_id')
+    
+    if not target_location:
+        return {"error": "Location required"}
+    
+    try:
+        # Get service stats for the location
+        cursor.execute("""
+            SELECT 
+                COUNT(*) as total_scheduled,
+                SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
+                SUM(CASE WHEN status = 'rescheduled' THEN 1 ELSE 0 END) as rescheduled
+            FROM service_schedule
+            WHERE location_id = ? AND scheduled_date >= date('now', '-{} days')
+        """.format(days), (target_location,))
+        row = cursor.fetchone()
+        total_scheduled = row[0] or 0
+        completed = row[1] or 0
+        rescheduled = row[2] or 0
+        
+        completed_pct = (completed / total_scheduled * 100) if total_scheduled > 0 else 0
+        reschedule_pct = (rescheduled / total_scheduled * 100) if total_scheduled > 0 else 0
+        
+        # Get revenue stats
+        cursor.execute("""
+            SELECT 
+                SUM(actual_price) as actual_revenue,
+                SUM(monthly_min) as estimated_min,
+                SUM(monthly_max) as estimated_max
+            FROM customers
+            WHERE location_id = ?
+        """, (target_location,))
+        row = cursor.fetchone()
+        actual_revenue = row[0] or 0
+        estimated_min = row[1] or 0
+        estimated_max = row[2] or 0
+        
+        # Get today's sales (new customers added today)
+        cursor.execute("""
+            SELECT COUNT(*) 
+            FROM customers 
+            WHERE location_id = ? AND date(created_at) = date('now')
+        """, (target_location,))
+        sales_today = cursor.fetchone()[0] or 0
+        
+        return {
+            "location_id": target_location,
+            "completed_pct": round(completed_pct, 1),
+            "reschedule_pct": round(reschedule_pct, 1),
+            "actual_revenue": round(actual_revenue, 2),
+            "estimated_revenue": round((estimated_min + estimated_max) / 2, 2),
+            "sales_today": sales_today,
+            "total_scheduled": total_scheduled,
+            "completed": completed,
+            "rescheduled": rescheduled
+        }
+    except Exception as e:
+        return {"error": str(e)}

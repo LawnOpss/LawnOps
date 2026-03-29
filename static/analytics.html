@@ -71,6 +71,12 @@
       align-items: center;
     }
 
+    .navbar-left {
+      display: flex;
+      align-items: center;
+      gap: 2rem;
+    }
+
     .navbar-brand {
       display: flex;
       align-items: center;
@@ -106,6 +112,46 @@
     .navbar-nav a:hover {
       color: var(--primary);
       background-color: rgba(30, 64, 175, 0.05);
+    }
+
+    /* USER DISPLAY */
+    .user-display {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-left: auto;
+      padding-left: 1.5rem;
+      border-left: 1px solid var(--border-color);
+    }
+
+    .user-info {
+      text-align: right;
+    }
+
+    .user-name {
+      font-weight: 600;
+      color: var(--text-primary);
+      font-size: 0.9rem;
+    }
+
+    .user-location {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+    }
+
+    .user-icon {
+      font-size: 1.5rem;
+      color: var(--primary);
+    }
+
+    .logout-btn {
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: 0.85rem;
+    }
+
+    .logout-btn:hover {
+      color: var(--danger);
     }
 
     /* CONTAINER */
@@ -460,15 +506,24 @@
   <!-- NAVBAR -->
   <nav class="navbar">
     <div class="navbar-content">
-      <a href="/" class="navbar-brand">
-        <i class="fas fa-leaf"></i> LawnOps
-      </a>
-      <ul class="navbar-nav">
-        <li><a href="/"><i class="fas fa-home"></i> Dashboard</a></li>
-        <li><a href="/owner"><i class="fas fa-cog"></i> Admin</a></li>
-        <li><a href="/routing.html"><i class="fas fa-map"></i> Routing</a></li>
-        <li><a href="/analytics"><i class="fas fa-chart-line"></i> Analytics</a></li>
-      </ul>
+      <div class="navbar-left">
+        <a href="/" class="navbar-brand">
+          <i class="fas fa-leaf"></i> LawnOps
+        </a>
+        <ul class="navbar-nav">
+          <li><a href="/"><i class="fas fa-home"></i> Dashboard</a></li>
+          <li><a href="/routing.html"><i class="fas fa-route"></i> Routing</a></li>
+          <li><a href="/owner"><i class="fas fa-cog"></i> Admin</a></li>
+        </ul>
+      </div>
+      <div class="user-display">
+        <div class="user-info">
+          <div class="user-name" id="userName"></div>
+          <div class="user-location" id="userLocation"></div>
+        </div>
+        <i class="fas fa-user-circle user-icon"></i>
+        <a href="/logout" class="logout-btn" title="Logout"><i class="fas fa-sign-out-alt"></i></a>
+      </div>
     </div>
   </nav>
 
@@ -485,194 +540,38 @@
       <button class="tab-btn active" data-tab="dashboard">
         <i class="fas fa-chart-line"></i> Dashboard
       </button>
-      <button class="tab-btn" data-tab="worker-view">
-        <i class="fas fa-user-hard-hat"></i> Worker View
-      </button>
-      <button class="tab-btn" data-tab="owner-view">
-        <i class="fas fa-chart-bar"></i> Owner View
-      </button>
-      <button class="tab-btn" data-tab="advanced-view">
-        <i class="fas fa-sliders-h"></i> Advanced
-      </button>
     </div>
 
-    <!-- ========== WORKER VIEW ========== -->
-    <div id="worker-view" class="tab-content active">
+    <!-- ========== DASHBOARD (Office Worker View) ========== -->
+    <div id="dashboard" class="tab-content active">
       <!-- TIME FILTERS -->
       <div class="filters">
-        <button class="filter-btn active" onclick="setWorkerDays(7);">This Week</button>
-        <button class="filter-btn" onclick="setWorkerDays(30);">This Month</button>
-        <button class="filter-btn" onclick="setWorkerDays(90);">Last Quarter</button>
+        <button class="filter-btn active" onclick="setDashboardDays(7);">This Week</button>
+        <button class="filter-btn" onclick="setDashboardDays(30);">This Month</button>
+        <button class="filter-btn" onclick="setDashboardDays(1);">Today</button>
       </div>
 
-      <!-- KPI CARDS -->
+      <!-- KPI CARDS - 4 SIMPLE METRICS -->
       <div class="kpi-grid">
         <div class="kpi-card">
-          <div class="kpi-label"><i class="fas fa-tasks"></i> Services Completed</div>
-          <div class="kpi-value"><span id="worker-services">0</span></div>
-          <div class="kpi-subtitle">in selected period</div>
+          <div class="kpi-label"><i class="fas fa-check-circle" style="color: var(--success);"></i> Completed</div>
+          <div class="kpi-value"><span id="dash-completed">0</span>%</div>
+          <div class="kpi-subtitle"><span id="dash-completed-count">0</span> of <span id="dash-total">0</span> jobs</div>
         </div>
         <div class="kpi-card">
-          <div class="kpi-label"><i class="fas fa-clock"></i> Hours Worked</div>
-          <div class="kpi-value"><span id="worker-hours">0</span> <span class="kpi-unit">hrs</span></div>
-          <div class="kpi-subtitle">labor hours</div>
+          <div class="kpi-label"><i class="fas fa-redo" style="color: var(--warning);"></i> Reschedule</div>
+          <div class="kpi-value"><span id="dash-reschedule">0</span>%</div>
+          <div class="kpi-subtitle"><span id="dash-rescheduled-count">0</span> rescheduled</div>
         </div>
         <div class="kpi-card">
-          <div class="kpi-label"><i class="fas fa-leaf"></i> Avg Condition</div>
-          <div class="kpi-value"><span id="worker-avg-condition">0</span> <span class="kpi-unit">%</span></div>
-          <div class="kpi-subtitle">after service</div>
+          <div class="kpi-label"><i class="fas fa-dollar-sign" style="color: var(--success);"></i> Revenue</div>
+          <div class="kpi-value">$<span id="dash-actual-rev">0</span></div>
+          <div class="kpi-subtitle">est: $<span id="dash-est-rev">0</span></div>
         </div>
         <div class="kpi-card">
-          <div class="kpi-label"><i class="fas fa-check-circle"></i> Most Common Issue</div>
-          <div class="kpi-value" id="worker-top-condition">—</div>
-          <div class="kpi-subtitle">diagnosis</div>
-        </div>
-      </div>
-
-      <!-- CHARTS -->
-      <div class="chart-grid">
-        <div class="chart-container">
-          <div class="chart-title"><i class="fas fa-chart-bar"></i> Services by Month</div>
-          <canvas id="workerServicesChart"></canvas>
-        </div>
-        <div class="chart-container">
-          <div class="chart-title"><i class="fas fa-chart-pie"></i> Conditions Found</div>
-          <canvas id="workerConditionsChart"></canvas>
-        </div>
-      </div>
-    </div>
-
-    <!-- ========== OWNER VIEW ========== -->
-    <div id="owner-view" class="tab-content">
-      <!-- TIME FILTERS -->
-      <div class="filters">
-        <button class="filter-btn active" onclick="setOwnerDays(7);">This Week</button>
-        <button class="filter-btn" onclick="setOwnerDays(30);">This Month</button>
-        <button class="filter-btn" onclick="setOwnerDays(90);">Last Quarter</button>
-      </div>
-
-      <!-- KPI CARDS -->
-      <div class="kpi-grid">
-        <div class="kpi-card">
-          <div class="kpi-label"><i class="fas fa-location-dot"></i> Active Locations</div>
-          <div class="kpi-value"><span id="owner-locations">0</span></div>
-          <div class="kpi-subtitle">service areas</div>
-        </div>
-        <div class="kpi-card">
-          <div class="kpi-label"><i class="fas fa-tasks"></i> Total Services</div>
-          <div class="kpi-value"><span id="owner-total-services">0</span></div>
-          <div class="kpi-subtitle">all locations</div>
-        </div>
-        <div class="kpi-card">
-          <div class="kpi-label"><i class="fas fa-clock"></i> Total Hours</div>
-          <div class="kpi-value"><span id="owner-total-hours">0</span> <span class="kpi-unit">hrs</span></div>
-          <div class="kpi-subtitle">crew capacity</div>
-        </div>
-        <div class="kpi-card">
-          <div class="kpi-label"><i class="fas fa-dollar-sign"></i> Est. Revenue</div>
-          <div class="kpi-value">$<span id="owner-est-revenue">0</span></div>
-          <div class="kpi-subtitle">labor + materials</div>
-        </div>
-      </div>
-
-      <!-- CHARTS -->
-      <div class="chart-grid">
-        <div class="chart-container">
-          <div class="chart-title"><i class="fas fa-chart-bar"></i> Services by Location</div>
-          <canvas id="locationServicesChart"></canvas>
-        </div>
-        <div class="chart-container">
-          <div class="chart-title"><i class="fas fa-chart-pie"></i> Revenue Distribution</div>
-          <canvas id="locationRevenueChart"></canvas>
-        </div>
-      </div>
-
-      <!-- LOCATION PERFORMANCE TABLE -->
-      <div style="margin-bottom: 2rem;">
-        <div class="section-header">
-          <h3 class="section-title"><i class="fas fa-building"></i> Location Performance</h3>
-          <span class="section-badge" id="locationCount">0 locations</span>
-        </div>
-        <div class="data-table">
-          <table>
-            <thead>
-              <tr>
-                <th>Location Name</th>
-                <th>Services</th>
-                <th>Customers</th>
-                <th>Total Hours</th>
-                <th>Est. Revenue</th>
-              </tr>
-            </thead>
-            <tbody id="locationsTableBody">
-              <tr>
-                <td colspan="5" class="empty-state">
-                  <i class="fas fa-spinner fa-spin"></i> Loading analytics...
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- TECHNICIAN PERFORMANCE TABLE -->
-      <div>
-        <div class="section-header">
-          <h3 class="section-title"><i class="fas fa-user-hard-hat"></i> Technician Performance</h3>
-          <span class="section-badge" id="technicianCount">0 technicians</span>
-        </div>
-        <div class="data-table">
-          <table>
-            <thead>
-              <tr>
-                <th>Technician</th>
-                <th>Services</th>
-                <th>Total Hours</th>
-                <th>Avg Condition After</th>
-                <th>Productivity</th>
-              </tr>
-            </thead>
-            <tbody id="workersTableBody">
-              <tr>
-                <td colspan="5" class="empty-state">
-                  <i class="fas fa-spinner fa-spin"></i> Loading analytics...
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-
-    <!-- ========== ADVANCED VIEW ========== -->
-    <div id="advanced-view" class="tab-content">
-      <!-- TIME FILTERS -->
-      <div class="filters">
-        <button class="filter-btn active" onclick="setAdvancedDays(7);">This Week</button>
-        <button class="filter-btn" onclick="setAdvancedDays(30);">This Month</button>
-        <button class="filter-btn" onclick="setAdvancedDays(90);">Last Quarter</button>
-      </div>
-
-      <!-- CHARTS -->
-      <div class="chart-grid">
-        <div class="chart-container">
-          <div class="chart-title"><i class="fas fa-chart-line"></i> Condition Improvement Trend</div>
-          <canvas id="conditionTrendChart"></canvas>
-        </div>
-        <div class="chart-container">
-          <div class="chart-title"><i class="fas fa-bar-chart"></i> Service Time Distribution</div>
-          <canvas id="timeDistributionChart"></canvas>
-        </div>
-      </div>
-
-      <div class="chart-grid">
-        <div class="chart-container">
-          <div class="chart-title"><i class="fas fa-cog"></i> Chemicals Used</div>
-          <canvas id="chemicalsChart"></canvas>
-        </div>
-        <div class="chart-container">
-          <div class="chart-title"><i class="fas fa-trending-up"></i> Material Costs</div>
-          <canvas id="costsChart"></canvas>
+          <div class="kpi-label"><i class="fas fa-phone" style="color: var(--primary);"></i> Sales Today</div>
+          <div class="kpi-value"><span id="dash-sales">0</span></div>
+          <div class="kpi-subtitle">new customers</div>
         </div>
       </div>
     </div>
@@ -680,504 +579,82 @@
 
   <script>
     const API_BASE = "http://localhost:8000";
-    let charts = {};
-    let currentWorkerDays = 30;
-    let currentOwnerDays = 30;
-    let currentAdvancedDays = 30;
+    let currentDashboardDays = 30;
+    let currentUserType = null;
+    let currentLocationId = null;
 
-    document.addEventListener("DOMContentLoaded", function() {
-      // Load route optimization data by default (since it's the first tab)
-      loadRouteOptimizationData();
-      
-      // Tab switching logic
-      document.querySelectorAll(".tab-btn").forEach(btn => {
-        btn.addEventListener("click", () => {
-          const tabId = btn.dataset.tab;
-          
-          // Update active button
-          document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
-          btn.classList.add("active");
-          
-          // Update active content
-          document.querySelectorAll(".tab-content").forEach(content => {
-            content.classList.remove("active");
-          });
-          document.getElementById(tabId).classList.add("active");
-          
-          // Load data for the active tab
-          if (tabId === "route-optimization") {
-            loadRouteOptimizationData();
-          } else if (tabId === "worker-view") {
-            loadWorkerData();
-          } else if (tabId === "owner-view") {
-            loadOwnerData();
-          } else if (tabId === "advanced-view") {
-            loadAdvancedData();
-          }
-        });
-      });
-    });
-
-    // ============ FILTER SWITCHES ============
-    function setWorkerDays(days) {
-      currentWorkerDays = days;
-      document.querySelectorAll("#worker-view .filter-btn").forEach(b => b.classList.remove("active"));
-      event.target.classList.add("active");
-      loadWorkerData();
-    }
-
-    function setOwnerDays(days) {
-      currentOwnerDays = days;
-      document.querySelectorAll("#owner-view .filter-btn").forEach(b => b.classList.remove("active"));
-      event.target.classList.add("active");
-      loadOwnerData();
-    }
-
-    function setAdvancedDays(days) {
-      currentAdvancedDays = days;
-      document.querySelectorAll("#advanced-view .filter-btn").forEach(b => b.classList.remove("active"));
-      event.target.classList.add("active");
-      loadAdvancedData();
-    }
-
-    // ============ ROUTE OPTIMIZATION DATA ============
-    async function loadRouteOptimizationData() {
-      try {
-        // Load efficiency metrics
-        const metricsResponse = await fetch("/route_efficiency_metrics");
-        const metricsData = await metricsResponse.json();
-        
-        if (metricsData.status === 'success') {
-          updateOptimizationMetrics(metricsData);
-          updateOptimizationHistory(metricsData.recent_history);
-        }
-
-        // Load cluster data
-        const clusterResponse = await fetch("/route_clusters");
-        const clusterData = await clusterResponse.json();
-        
-        if (clusterData.status === 'success') {
-          updateClusterSummary(clusterData);
-        }
-
-        // Load predicted schedule
-        const scheduleResponse = await fetch("/predicted_schedule?days_ahead=30");
-        const scheduleData = await scheduleResponse.json();
-        
-        if (scheduleData.status === 'success') {
-          updateScheduleCalendar(scheduleData.data);
-        }
-
-      } catch (error) {
-        console.error("Route optimization data error:", error);
-      }
-    }
-
-    function updateOptimizationMetrics(data) {
-      const current = data.current_schedule;
-      const averages = data.averages;
-      
-      document.getElementById('scheduledCustomers').textContent = current.total_scheduled || 0;
-      document.getElementById('totalDistance').textContent = `${averages.distance_per_customer.toFixed(1)} mi/customer`;
-      document.getElementById('fuelCost').textContent = `$${(averages.distance_per_customer * current.total_scheduled * 0.50).toFixed(2)}`;
-      document.getElementById('efficiencyScore').textContent = averages.efficiency_score.toFixed(2);
-      
-      // Update last optimization time
-      if (data.recent_history && data.recent_history.length > 0) {
-        const lastOpt = new Date(data.recent_history[0].date).toLocaleDateString();
-        document.getElementById('lastOptimization').textContent = lastOpt;
-        document.getElementById('lastOptimization').style.background = '#dcfce7';
-        document.getElementById('lastOptimization').style.color = '#166534';
-      }
-    }
-
-    function updateClusterSummary(data) {
-      const summaryEl = document.getElementById('clusterSummary');
-      
-      if (!data.clusters || Object.keys(data.clusters).length === 0) {
-        summaryEl.innerHTML = '<p style="color: var(--text-secondary); text-align: center; padding: 2rem;">No clusters available. Run optimization first.</p>';
-        return;
-      }
-
-      let html = '<div style="display: grid; gap: 1rem;">';
-      
-      Object.entries(data.clusters).forEach(([clusterId, cluster]) => {
-        html += `
-          <div style="padding: 1rem; background: var(--bg-secondary); border-radius: 8px; border: 1px solid var(--border-color);">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-              <div>
-                <strong>${clusterId}</strong>
-                <div style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.25rem;">
-                  ${cluster.customer_count} customers
-                </div>
-              </div>
-              <div style="font-size: 1.5rem; color: var(--primary); opacity: 0.5;">
-                <i class="fas fa-map-marker-alt"></i>
-              </div>
-            </div>
-          </div>
-        `;
-      });
-      
-      html += '</div>';
-      summaryEl.innerHTML = html;
-    }
-
-    function updateScheduleCalendar(data) {
-      const calendarEl = document.getElementById('scheduleCalendar');
-      
-      if (!data.schedule || Object.keys(data.schedule).length === 0) {
-        calendarEl.innerHTML = '<p style="color: var(--text-secondary); text-align: center; grid-column: 1/-1; padding: 2rem;">No schedule available. Run optimization first.</p>';
-        return;
-      }
-
-      // Generate calendar grid
-      const today = new Date();
-      const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-      
-      let html = '';
-      
-      // Add day headers
-      daysOfWeek.forEach(day => {
-        html += `<div style="font-weight: 600; font-size: 0.8rem; color: var(--text-secondary); text-align: center; padding: 0.5rem;">${day}</div>`;
-      });
-      
-      // Add calendar days for 30 days
-      for (let day = 0; day < 30; day++) {
-        const currentDate = new Date(today);
-        currentDate.setDate(today.getDate() + day);
-        const dateStr = currentDate.toISOString().split('T')[0];
-        const dayOfWeek = currentDate.getDay();
-        
-        const daySchedule = data.schedule[dateStr];
-        const customerCount = daySchedule ? daySchedule.reduce((total, cluster) => total + cluster.length, 0) : 0;
-        
-        // Position the day correctly in the grid
-        if (day === 0) {
-          // Add empty cells for days before the first day of the month
-          for (let i = 0; i < dayOfWeek; i++) {
-            html += '<div></div>';
-          }
-        }
-        
-        const bgColor = customerCount > 0 
-          ? customerCount > 5 ? 'var(--primary)' : 'var(--success)'
-          : 'var(--gray-100)';
-        const textColor = customerCount > 0 ? 'white' : 'var(--text-secondary)';
-        
-        html += `
-          <div style="
-            padding: 0.5rem; 
-            background: ${bgColor}; 
-            color: ${textColor}; 
-            border-radius: 6px; 
-            text-align: center; 
-            font-size: 0.8rem;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            min-height: 60px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-          "
-          title="${customerCount} customers scheduled"
-          onclick="showDayDetails('${dateStr}')"
-        >
-            <div style="font-weight: 600;">${currentDate.getDate()}</div>
-            ${customerCount > 0 ? `<div style="font-size: 0.7rem;">${customerCount} jobs</div>` : ''}
-          </div>
-        `;
-      }
-      
-      calendarEl.innerHTML = html;
-    }
-
-    function updateOptimizationHistory(history) {
-      const historyEl = document.getElementById('optimizationHistory');
-      
-      if (!history || history.length === 0) {
-        historyEl.innerHTML = '<p style="color: var(--text-secondary); text-align: center; padding: 2rem;">No optimization history available.</p>';
-        return;
-      }
-
-      let html = '<div style="display: grid; gap: 0.5rem;">';
-      
-      history.forEach((record, index) => {
-        const date = new Date(record.date).toLocaleDateString();
-        const efficiencyColor = record.efficiency_score > 2 ? 'var(--success)' : record.efficiency_score > 1 ? 'var(--warning)' : 'var(--danger)';
-        
-        html += `
-          <div style="
-            padding: 1rem; 
-            background: var(--bg-secondary); 
-            border-radius: 8px; 
-            border: 1px solid var(--border-color);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-          ">
-            <div>
-              <div style="font-weight: 600; color: var(--text-primary);">${date}</div>
-              <div style="font-size: 0.85rem; color: var(--text-secondary);">
-                ${record.total_customers} customers • ${record.total_distance.toFixed(1)} mi • ${record.algorithm_used}
-              </div>
-            </div>
-            <div style="text-align: right;">
-              <div style="font-size: 0.85rem; color: var(--text-secondary);">Efficiency</div>
-              <div style="font-weight: 700; color: ${efficiencyColor};">${record.efficiency_score.toFixed(2)}</div>
-            </div>
-          </div>
-        `;
-      });
-      
-      html += '</div>';
-      historyEl.innerHTML = html;
-    }
-
-    function showDayDetails(dateStr) {
-      // This could open a modal showing detailed route for that day
-      alert(`Route details for ${dateStr} - Feature coming soon!`);
-    }
-
-    // Event listeners for route optimization
-    document.getElementById('quickOptimizeBtn').addEventListener('click', async function() {
-      this.disabled = true;
-      this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Optimizing...';
-      
-      try {
-        const response = await fetch("/optimize_routes", {method: "POST"});
-        const data = await response.json();
-        
-        if (data.status === 'success') {
-          // Reload all optimization data
-          await loadRouteOptimizationData();
-          showNotification('Routes optimized successfully!', 'success');
-        } else {
-          throw new Error(data.message);
-        }
-      } catch (error) {
-        showNotification('Optimization failed: ' + error.message, 'error');
-      } finally {
-        this.disabled = false;
-        this.innerHTML = '<i class="fas fa-magic"></i> Quick Optimize (30 Days)';
-      }
-    });
-
-    document.getElementById('refreshMetricsBtn').addEventListener('click', function() {
-      loadRouteOptimizationData();
-      showNotification('Metrics refreshed', 'success');
-    });
-
-    function showNotification(message, type = 'info') {
-      const notification = document.createElement('div');
-      notification.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        padding: 1rem 1.5rem;
-        border-radius: 8px;
-        color: white;
-        font-weight: 500;
-        z-index: 10000;
-        animation: slideIn 0.3s ease;
-        max-width: 300px;
-      `;
-      
-      switch(type) {
-        case 'success':
-          notification.style.background = '#10b981';
-          break;
-        case 'error':
-          notification.style.background = '#ef4444';
-          break;
-        default:
-          notification.style.background = '#3b82f6';
-      }
-      
-      notification.textContent = message;
-      document.body.appendChild(notification);
-      
-      setTimeout(() => {
-        notification.style.animation = 'slideOut 0.3s ease';
-        setTimeout(() => document.body.removeChild(notification), 300);
-      }, 3000);
-    }
-
-    // ============ WORKER DATA ============
-    async function loadWorkerData() {
-      try {
-        const response = await fetch(`${API_BASE}/analytics/worker-performance?days=${currentWorkerDays}`);
-        const data = await response.json();
-
-        document.getElementById("worker-services").textContent = data.total_services || 0;
-        document.getElementById("worker-hours").textContent = (data.total_hours || 0).toFixed(1);
-        document.getElementById("worker-avg-condition").textContent = (data.avg_condition_after || 0).toFixed(0);
-        document.getElementById("worker-top-condition").textContent = data.most_common_condition || "—";
-
-        // Charts
-        updateChart("workerServicesChart", "bar", {
-          labels: data.daily_services?.map(d => d.date) || [],
-          datasets: [{
-            label: "Services",
-            data: data.daily_services?.map(d => d.count) || [],
-            backgroundColor: "rgba(30, 64, 175, 0.8)",
-            borderRadius: 4
-          }]
-        });
-
-        updateChart("workerConditionsChart", "doughnut", {
-          labels: data.conditions_found?.map(c => c.condition) || [],
-          datasets: [{
-            data: data.conditions_found?.map(c => c.count) || [],
-            backgroundColor: [
-              "rgba(30, 64, 175, 0.8)",
-              "rgba(59, 130, 246, 0.8)",
-              "rgba(147, 197, 253, 0.8)",
-              "rgba(16, 185, 129, 0.8)",
-              "rgba(245, 158, 11, 0.8)"
-            ]
-          }]
-        });
-      } catch (error) {
-        console.error("Worker data error:", error);
-      }
-    }
-
-    // ============ OWNER DATA ============
-    async function loadOwnerData() {
-      try {
-        const response = await fetch(`${API_BASE}/analytics/overview?days=${currentOwnerDays}`);
-        const data = await response.json();
-
-        document.getElementById("owner-locations").textContent = data.locations_count || 0;
-        document.getElementById("owner-total-services").textContent = data.total_services || 0;
-        document.getElementById("owner-total-hours").textContent = (data.total_hours || 0).toFixed(1);
-        document.getElementById("owner-est-revenue").textContent = (data.estimated_revenue || 0).toFixed(0);
-
-        // Location charts
-        const locationData = await fetch(`${API_BASE}/analytics/by-location?days=${currentOwnerDays}`).then(r => r.json());
-
-        updateChart("locationServicesChart", "bar", {
-          labels: locationData.by_location?.map(l => l.location_name) || [],
-          datasets: [{
-            label: "Services",
-            data: locationData.by_location?.map(l => l.service_count) || [],
-            backgroundColor: "rgba(30, 64, 175, 0.8)",
-            borderRadius: 4
-          }]
-        });
-
-        updateChart("locationRevenueChart", "doughnut", {
-          labels: locationData.by_location?.map(l => l.location_name) || [],
-          datasets: [{
-            data: locationData.by_location?.map(l => l.estimated_revenue) || [],
-            backgroundColor: [
-              "rgba(30, 64, 175, 0.8)",
-              "rgba(59, 130, 246, 0.8)",
-              "rgba(16, 185, 129, 0.8)",
-              "rgba(245, 158, 11, 0.8)",
-              "rgba(239, 68, 68, 0.8)"
-            ]
-          }]
-        });
-
-        // Location table
-        document.getElementById("locationCount").textContent = `${locationData.by_location?.length || 0} locations`;
-        document.getElementById("locationsTableBody").innerHTML = (locationData.by_location || [])
-          .map(loc => `<tr>
-            <td><strong>${loc.location_name}</strong></td>
-            <td><span class="table-cell-badge badge-primary">${loc.service_count}</span></td>
-            <td>${loc.unique_customers || 0}</td>
-            <td>${loc.total_hours?.toFixed(1) || 0}</td>
-            <td><strong>$${loc.estimated_revenue?.toFixed(0) || 0}</strong></td>
-          </tr>`).join("") || "<tr><td colspan='5' class='empty-state'>No data available</td></tr>";
-
-        // Technician table
-        const techData = await fetch(`${API_BASE}/analytics/worker-performance?days=${currentOwnerDays}`).then(r => r.json());
-        document.getElementById("technicianCount").textContent = `${techData.technicians?.length || 0} technicians`;
-        document.getElementById("workersTableBody").innerHTML = (techData.technicians || [])
-          .map(tech => `<tr>
-            <td><strong>${tech.technician_name}</strong></td>
-            <td><span class="table-cell-badge badge-primary">${tech.service_count}</span></td>
-            <td>${tech.total_hours?.toFixed(1) || 0}</td>
-            <td><span class="table-cell-badge badge-success">${tech.avg_condition_after?.toFixed(0) || 0}%</span></td>
-            <td>${(tech.service_count && tech.total_hours ? (tech.service_count / tech.total_hours).toFixed(2) : 0)} svc/hr</td>
-          </tr>`).join("") || "<tr><td colspan='5' class='empty-state'>No data available</td></tr>";
-      } catch (error) {
-        console.error("Owner data error:", error);
-      }
-    }
-
-    // ============ ADVANCED DATA ============
-    async function loadAdvancedData() {
-      try {
-        const response = await fetch(`${API_BASE}/analytics/condition-trends?days=${currentAdvancedDays}`);
-        const data = response.ok ? await response.json() : {};
-
-        updateChart("conditionTrendChart", "line", {
-          labels: data.dates || [],
-          datasets: [{
-            label: "Avg Condition Before",
-            data: data.avg_condition_before || [],
-            borderColor: "rgba(239, 68, 68, 0.8)",
-            backgroundColor: "rgba(239, 68, 68, 0.1)",
-            tension: 0.3
-          }, {
-            label: "Avg Condition After",
-            data: data.avg_condition_after || [],
-            borderColor: "rgba(16, 185, 129, 0.8)",
-            backgroundColor: "rgba(16, 185, 129, 0.1)",
-            tension: 0.3
-          }]
-        });
-
-        updateChart("timeDistributionChart", "bar", {
-          labels: ["0-30 min", "30-60 min", "60-90 min", "90+ min"],
-          datasets: [{
-            label: "Service Count",
-            data: [
-              data.services_0_30 || 0,
-              data.services_30_60 || 0,
-              data.services_60_90 || 0,
-              data.services_90_plus || 0
-            ],
-            backgroundColor: "rgba(30, 64, 175, 0.8)",
-            borderRadius: 4
-          }]
-        });
-      } catch (error) {
-        console.error("Advanced data error:", error);
-      }
-    }
-
-    // ============ CHART HELPER ============
-    function updateChart(elementId, type, config) {
-      const ctx = document.getElementById(elementId)?.getContext("2d");
-      if (!ctx) return;
-
-      if (charts[elementId]) charts[elementId].destroy();
-
-      charts[elementId] = new Chart(ctx, {
-        type,
-        data: config,
-        options: {
-          responsive: true,
-          maintainAspectRatio: true,
-          plugins: { 
-            legend: { display: true, position: type === "doughnut" ? "bottom" : "top" }
-          },
-          scales: type !== "doughnut" && type !== "pie" ? {
-            y: { beginAtZero: true }
-          } : undefined
-        }
-      });
-    }
-
-    // ============ INIT ============
     document.addEventListener("DOMContentLoaded", () => {
-      loadWorkerData();
+      loadCurrentUser();
     });
+
+    function setDashboardDays(days) {
+      currentDashboardDays = days;
+      document.querySelectorAll("#dashboard .filter-btn").forEach(b => b.classList.remove("active"));
+      event.target.classList.add("active");
+      loadDashboardData();
+    }
+
+    // ============ DASHBOARD DATA (Office Worker) ============
+    async function loadDashboardData() {
+      try {
+        const response = await fetch(`${API_BASE}/analytics/office-dashboard?days=${currentDashboardDays}`);
+        const data = await response.json();
+        
+        if (data.error) {
+          console.error('Dashboard error:', data.error);
+          return;
+        }
+        
+        document.getElementById("dash-completed").textContent = data.completed_pct || 0;
+        document.getElementById("dash-completed-count").textContent = data.completed || 0;
+        document.getElementById("dash-total").textContent = data.total_scheduled || 0;
+        document.getElementById("dash-reschedule").textContent = data.reschedule_pct || 0;
+        document.getElementById("dash-rescheduled-count").textContent = data.rescheduled || 0;
+        document.getElementById("dash-actual-rev").textContent = (data.actual_revenue || 0).toFixed(0);
+        document.getElementById("dash-est-rev").textContent = (data.estimated_revenue || 0).toFixed(0);
+        document.getElementById("dash-sales").textContent = data.sales_today || 0;
+      } catch (error) {
+        console.error("Dashboard data error:", error);
+      }
+    }
+
+    // Load current user info
+    async function loadCurrentUser() {
+      try {
+        const res = await fetch(`${API_BASE}/me`);
+        const data = await res.json();
+        
+        if (data.authenticated) {
+          const userNameEl = document.getElementById('userName');
+          const userLocationEl = document.getElementById('userLocation');
+          
+          if (!userNameEl || !userLocationEl) {
+            console.error('User display elements not found');
+            return;
+          }
+          
+          // Store user info globally
+          currentUserType = data.user_type;
+          currentLocationId = data.location_id;
+          
+          if (data.user_type === 'admin') {
+            userNameEl.textContent = 'Admin';
+            userLocationEl.textContent = data.username || '';
+          } else if (data.user_type === 'office_worker') {
+            userNameEl.textContent = data.worker_name || data.username;
+            const locRes = await fetch(`${API_BASE}/locations`);
+            const locData = await locRes.json();
+            const location = locData.locations?.find(l => l.id === data.location_id);
+            userLocationEl.textContent = location?.name || '';
+          }
+          
+          // Load dashboard data for everyone
+          loadDashboardData();
+        }
+      } catch (e) {
+        console.error('Load current user error:', e);
+      }
+    }
   </script>
 </body>
 </html>
