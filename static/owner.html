@@ -2565,15 +2565,19 @@
     document.getElementById("tab-treatments").addEventListener("click", () => {
       document.getElementById("treatments").classList.add("active");
       document.getElementById("locations").classList.remove("active");
+      document.getElementById("technicians").classList.remove("active");
+      document.getElementById("office").classList.remove("active");
       document.getElementById("tab-treatments").classList.add("active");
       document.getElementById("tab-locations").classList.remove("active");
       document.getElementById("tab-technicians").classList.remove("active");
+      document.getElementById("tab-office").classList.remove("active");
     });
 
     document.getElementById("tab-locations").addEventListener("click", () => {
       document.getElementById("treatments").classList.remove("active");
       document.getElementById("locations").classList.add("active");
       document.getElementById("technicians").classList.remove("active");
+      document.getElementById("office").classList.remove("active");
       document.getElementById("tab-treatments").classList.remove("active");
       document.getElementById("tab-locations").classList.add("active");
       document.getElementById("tab-technicians").classList.remove("active");
@@ -2606,25 +2610,46 @@
       loadOfficeWorkers();
     });
 
-    document.getElementById("addLocationBtn").addEventListener("click", addLocationUI);
-    document.getElementById("addTechnicianBtn").addEventListener("click", addTechnician);
-    document.getElementById("addOfficeWorkerBtn").addEventListener("click", addOfficeWorker);
-    document.getElementById("autoAssignTerritoriesBtn").addEventListener("click", autoAssignTerritories);
-    document.getElementById("unassignTerritoriesBtn").addEventListener("click", unassignAllTerritories);
-    document.getElementById("drawTerritoriesBtn").addEventListener("click", openTerritoryModal);
-    document.getElementById("startDrawingBtn").addEventListener("click", startDrawing);
+    // Event listeners will be attached after page loads
+    setTimeout(() => {
+      const addLocationBtn = document.getElementById("addLocationBtn");
+      if (addLocationBtn) addLocationBtn.addEventListener("click", addLocationUI);
+      
+      const addTechnicianBtn = document.getElementById("addTechnicianBtn");
+      if (addTechnicianBtn) addTechnicianBtn.addEventListener("click", addTechnician);
+      
+      const addOfficeWorkerBtn = document.getElementById("addOfficeWorkerBtn");
+      if (addOfficeWorkerBtn) addOfficeWorkerBtn.addEventListener("click", addOfficeWorker);
+      
+      const autoAssignTerritoriesBtn = document.getElementById("autoAssignTerritoriesBtn");
+      if (autoAssignTerritoriesBtn) autoAssignTerritoriesBtn.addEventListener("click", autoAssignTerritories);
+      
+      const unassignTerritoriesBtn = document.getElementById("unassignTerritoriesBtn");
+      if (unassignTerritoriesBtn) unassignTerritoriesBtn.addEventListener("click", unassignAllTerritories);
+      
+      const drawTerritoriesBtn = document.getElementById("drawTerritoriesBtn");
+      if (drawTerritoriesBtn) drawTerritoriesBtn.addEventListener("click", openTerritoryModal);
+      
+      const startDrawingBtn = document.getElementById("startDrawingBtn");
+      if (startDrawingBtn) startDrawingBtn.addEventListener("click", startDrawing);
 
-    // Technician location filter dropdown
-    document.getElementById("technicianLocationFilter").addEventListener("change", function() {
-      const selectedLocationId = this.value;
-      filterTechniciansByLocation(selectedLocationId);
-    });
+      // Location filter dropdowns
+      const technicianLocationFilter = document.getElementById("technicianLocationFilter");
+      if (technicianLocationFilter) {
+        technicianLocationFilter.addEventListener("change", function() {
+          const selectedLocationId = this.value;
+          filterTechniciansByLocation(selectedLocationId);
+        });
+      }
 
-    // Office worker location filter dropdown
-    document.getElementById("officeWorkerLocationFilter").addEventListener("change", function() {
-      const selectedLocationId = this.value;
-      filterOfficeWorkersByLocation(selectedLocationId);
-    });
+      const officeWorkerLocationFilter = document.getElementById("officeWorkerLocationFilter");
+      if (officeWorkerLocationFilter) {
+        officeWorkerLocationFilter.addEventListener("change", function() {
+          const selectedLocationId = this.value;
+          filterOfficeWorkersByLocation(selectedLocationId);
+        });
+      }
+    }, 100);
 
     // ============ LOCATION FILTERING ============
     function filterTechniciansByLocation(locationId) {

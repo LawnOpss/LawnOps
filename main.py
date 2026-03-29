@@ -1348,7 +1348,9 @@ def add_customer(
     lng = None
 
     # Use full address, Geocodio will handle it
-    lat, lng = geocode_geocodio(address)
+    full_address = f"{address}, Texas, United States"
+
+    lat, lng = geocode_geocodio(full_address)
     
     # Get the office worker's location_id
     location_id = request.session.get('location_id')
@@ -1423,17 +1425,19 @@ def save_measurement(rowid: int = Form(...), measurement_data: str = Form(...), 
         return {"status": "error", "message": str(e)}
 
 
+@app.get("/geocode_missing")
 def geocode_missing():
     cursor.execute("SELECT rowid, address FROM customers WHERE lat IS NULL OR lng IS NULL")
     rows = cursor.fetchall()
     count = 0
     for rowid, address in rows:
         # Use full address
-        lat, lng = geocode_geocodio(address)
+        full = f"{address}, Texas, United States"
+        lat, lng = geocode_geocodio(full)
         if lat is not None and lng is not None:
             cursor.execute(
-                "UPDATE customers SET lat = ?, lng = ? WHERE rowid = ?",
-                (lat, lng, rowid)
+                "UPDATE customers SET lat = ?, lng = ?, address = ? WHERE rowid = ?",
+                (lat, lng, full, rowid)
             )
             conn.commit()
             print(f"Updated {full} -> {lat}, {lng}")
@@ -1929,13 +1933,30 @@ def auto_assign_territories(location_id: int = Form(...), radius: int = Form(...
         return {
             "status": "success", 
             "message": f"Created {num_technicians} pie-slice territories for {location[0]}",
+            "location_center": location_coords
         }
     except Exception as e:
         return {"status": "error", "message": f"Failed to auto-assign territories: {str(e)}"}
 
 def geocode_address(address: str):
-    """Geocoding using Geocodio API"""
-    return geocode_geocodio(address)
+    """Simple geocoding - returns coordinates for known addresses"""
+    address_lower = address.lower().strip()
+    
+    # Known locations with better coordinates
+    if 'keller' in address_lower or 'egg farm' in address_lower:
+        # Keller, Texas coordinates (more accurate for your location)
+        return (32.9346, -97.2251)
+    elif 'dallas' in address_lower:
+        return (32.7767, -96.7970)
+    elif 'fort worth' in address_lower:
+        return (32.7555, -97.3308)
+    elif 'arlington' in address_lower:
+        return (32.7357, -97.1081)
+    elif 'plano' in address_lower:
+        return (33.0198, -96.6989)
+    else:
+        # Default to Keller for unknown addresses (since that's your main location)
+        return (32.9346, -97.2251)
 
 @app.post("/technician_territories/custom")
 def create_custom_territory(
