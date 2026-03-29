@@ -1,18 +1,34 @@
 import sqlite3
 
-# Check database structure
+# Update locations with proper geocoded coordinates
 conn = sqlite3.connect('database.db')
 cursor = conn.cursor()
 
-# List all tables
-cursor.execute('SELECT name FROM sqlite_master WHERE type="table"')
-tables = cursor.fetchall()
-print('Tables:', [t[0] for t in tables])
+# Import the geocoding function from main.py
+import sys
+sys.path.append('.')
+from main import geocode_geocodio
 
-# Check if service_schedule table exists
-if any('service_schedule' in t for t in tables):
-    cursor.execute('PRAGMA table_info(service_schedule)')
-    columns = cursor.fetchall()
-    print('service_schedule columns:', [col[1] for col in columns])
+# Get all locations and geocode their addresses properly
+cursor.execute('SELECT id, name, address FROM locations')
+locations = cursor.fetchall()
+
+print('Geocoding all locations with proper addresses:')
+for loc_id, name, address in locations:
+    if address:  # Only geocode if address exists
+        lat, lng = geocode_geocodio(address)
+        print(f'{name}: "{address}" -> ({lat}, {lng})')
+        
+        # Update with geocoded coordinates
+        cursor.execute('UPDATE locations SET lat = ?, lng = ? WHERE id = ?', (lat, lng, loc_id))
+
+conn.commit()
+
+# Verify the updates
+cursor.execute('SELECT id, name, address, lat, lng FROM locations')
+locations = cursor.fetchall()
+print('\nUpdated Locations:')
+for loc in locations:
+    print(f'  ID: {loc[0]}, Name: {loc[1]}, Address: {loc[2]}, Lat: {loc[3]}, Lng: {loc[4]}')
 
 conn.close()

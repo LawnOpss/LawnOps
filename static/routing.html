@@ -373,80 +373,60 @@
         </div>
     </nav>
 
-    <div class="container">
-        <div class="header">
-            <h1><i class="fas fa-route"></i> Intelligent Route Planning</h1>
-            <p>AI-powered route optimization and predictive scheduling for maximum efficiency</p>
-        </div>
-
+    <div class="container" style="display: flex; flex-direction: column; height: calc(100vh - 70px); padding: 1rem; gap: 1rem;">
         <!-- Control Panel -->
-        <div class="control-panel" style="background: var(--white); padding: 1.5rem; border-radius: 16px; box-shadow: var(--shadow-lg); margin-bottom: 1.5rem;">
-            <div style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
-                <button id="optimizeBtn" class="btn btn-primary" style="background: linear-gradient(135deg, var(--primary), var(--primary-dark));">
-                    <i class="fas fa-magic"></i> Optimize Routes (30 Days)
+        <div class="control-panel" style="background: var(--white); padding: 1rem; border-radius: 12px; box-shadow: var(--shadow-lg); flex-shrink: 0;">
+            <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+                <!-- Due Today Metric -->
+                <div style="background: linear-gradient(135deg, #fef3c7, #fde68a); padding: 0.5rem 1rem; border-radius: 8px; border-left: 4px solid #f59e0b; display: flex; align-items: center; gap: 0.5rem;">
+                    <i class="fas fa-exclamation-circle" style="color: #d97706;"></i>
+                    <div>
+                        <div style="font-size: 0.75rem; color: #92400e; font-weight: 600;">DUE TODAY</div>
+                        <div id="dueTodayCount" style="font-size: 1.25rem; font-weight: 700; color: #78350f;">0</div>
+                    </div>
+                </div>
+                
+                <button id="showTerritoriesBtn" class="btn btn-secondary" style="background: var(--accent); color: white; padding: 0.75rem 1rem;">
+                    <i class="fas fa-map-marked-alt"></i> Show Territories
                 </button>
-                <button id="showClustersBtn" class="btn btn-secondary" style="background: var(--secondary); color: white;">
-                    <i class="fas fa-map-marked-alt"></i> Show Clusters
-                </button>
-                <button id="hideClustersBtn" class="btn btn-secondary" style="background: var(--gray-500); color: white; display: none;">
-                    <i class="fas fa-eye-slash"></i> Hide Clusters
+                <button id="hideTerritoriesBtn" class="btn btn-secondary" style="background: var(--gray-500); color: white; display: none; padding: 0.75rem 1rem;">
+                    <i class="fas fa-eye-slash"></i> Hide Territories
                 </button>
                 <div style="margin-left: auto; display: flex; gap: 0.5rem; align-items: center;">
-                    <span style="font-size: 0.9rem; color: var(--gray-600);">Optimization Status:</span>
-                    <span id="optimizationStatus" style="padding: 0.25rem 0.75rem; background: var(--gray-100); border-radius: 20px; font-size: 0.85rem; color: var(--gray-600);">Not Optimized</span>
+                    <span style="font-size: 0.9rem; color: var(--gray-600);">Status:</span>
+                    <span id="dailyRoutesStatus" style="padding: 0.25rem 0.75rem; background: var(--gray-100); border-radius: 20px; font-size: 0.85rem; color: var(--gray-600);">Not Generated</span>
                 </div>
             </div>
         </div>
 
-        <!-- Metrics Dashboard -->
-        <div class="metrics-dashboard" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
-            <div class="metric-card" style="background: var(--white); padding: 1rem; border-radius: 12px; box-shadow: var(--shadow); border-left: 4px solid var(--primary);">
-                <div style="font-size: 0.85rem; color: var(--gray-600);">Customers Scheduled</div>
-                <div id="scheduledCount" style="font-size: 1.5rem; font-weight: 700; color: var(--primary);">0</div>
-            </div>
-            <div class="metric-card" style="background: var(--white); padding: 1rem; border-radius: 12px; box-shadow: var(--shadow); border-left: 4px solid var(--success);">
-                <div style="font-size: 0.85rem; color: var(--gray-600);">Total Distance</div>
-                <div id="totalDistance" style="font-size: 1.5rem; font-weight: 700; color: var(--success);">0 mi</div>
-            </div>
-            <div class="metric-card" style="background: var(--white); padding: 1rem; border-radius: 12px; box-shadow: var(--shadow); border-left: 4px solid var(--warning);">
-                <div style="font-size: 0.85rem; color: var(--gray-600);">Service Time</div>
-                <div id="serviceTime" style="font-size: 1.5rem; font-weight: 700; color: var(--warning);">0 hrs</div>
-            </div>
-            <div class="metric-card" style="background: var(--white); padding: 1rem; border-radius: 12px; box-shadow: var(--shadow); border-left: 4px solid var(--accent);">
-                <div style="font-size: 0.85rem; color: var(--gray-600);">Fuel Cost</div>
-                <div id="fuelCost" style="font-size: 1.5rem; font-weight: 700; color: var(--accent);">$0</div>
-            </div>
-        </div>
-
-        <div class="routing-layout">
-            <div class="map-container">
-                <div class="map-viewport">
-                    <div id="map"></div>
+        <!-- Main Content: Map + Routes Side by Side -->
+        <div style="display: flex; flex: 1; gap: 1rem; min-height: 0;">
+            <!-- Left: Map -->
+            <div style="flex: 2; display: flex; flex-direction: column; min-height: 0;">
+                <div class="map-container" style="flex: 1; border-radius: 12px; overflow: hidden; box-shadow: var(--shadow-xl); border: 1px solid var(--gray-200);">
+                    <div class="map-viewport" style="width: 100%; height: 100%;">
+                        <div id="map"></div>
+                    </div>
                 </div>
             </div>
 
-            <div class="right-panel">
-                <!-- Customers Due Soon list only -->
-                <div class="due-list" id="dueList">
-                    <h3>
-                        <i class="fas fa-exclamation-triangle"></i>
-                        Customers Due Soon (<span id="dueCount">0</span>)
-                    </h3>
-                    <p id="dueEmpty">Loading customers…</p>
-                    <div id="dueCustomers"></div>
-                    <button id="buildRoute" class="build-route-btn">
-                        <i class="fas fa-route"></i> Build Route from Selected
-                    </button>
+            <!-- Right: Routes Panel -->
+            <div style="flex: 1; max-width: 450px; display: flex; flex-direction: column; min-height: 0;">
+                <!-- Daily Routes Display -->
+                <div id="dailyRoutesContainer" style="display: none; background: var(--white); border-radius: 12px; box-shadow: var(--shadow-lg); border-left: 4px solid #10b981; overflow: hidden; flex: 1; display: flex; flex-direction: column;">
+                    <div style="padding: 1rem; border-bottom: 1px solid var(--gray-200); flex-shrink: 0;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <h3 style="margin: 0; color: var(--gray-800); font-size: 1.1rem;"><i class="fas fa-route" style="color: #10b981;"></i> Today's Routes</h3>
+                            <div id="dailyRoutesSummary" style="font-size: 0.85rem; color: var(--gray-600);"></div>
+                        </div>
+                    </div>
+                    <div id="dailyRoutesList" style="overflow-y: auto; padding: 1rem; flex: 1;"></div>
                 </div>
 
-                <!-- Customers Not Due Yet list -->
-                <div class="due-list" id="notDueList">
-                    <h3>
-                        <i class="fas fa-clock"></i>
-                        Customers Not Due Yet 
-                    </h3>
-                    <p id="notDueEmpty">No customers not due yet.</p>
-                    <div id="notDueCustomers"></div>
+                <!-- Empty state -->
+                <div id="emptyRoutesState" style="background: var(--white); border-radius: 12px; box-shadow: var(--shadow-lg); padding: 2rem; text-align: center; color: var(--gray-500);">
+                    <i class="fas fa-route" style="font-size: 3rem; margin-bottom: 1rem; color: var(--gray-300);"></i>
+                    <p>Click "Generate Today's Routes" to see optimized routes for each technician.</p>
                 </div>
             </div>
         </div>
@@ -460,14 +440,9 @@
     </script>
 
     <script>
-        // Initialize Leaflet map
-        const map = L.map('map').setView([32.84, -97.19], 12);
-
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 19,
-            attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-        }).addTo(map);
-
+        // Global map variable
+        let map = null;
+        
         // Global variables for optimization
         let clusterMarkers = [];
         let routeMarkers = [];
@@ -475,17 +450,60 @@
         let clusterData = null;
         let territoryMarkers = [];
         let technicianData = null;
+        let dailyRoutesData = null; // Store routes for view route function
+        let officeLocation = null;
+        
+        // Initialize map first with default view, then update based on user location
+        function initMap() {
+            // Create map with default center first
+            map = L.map('map').setView([32.9346, -97.2251], 12); // Default to Keller
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+            }).addTo(map);
+            
+            // Try to get user's location from /me endpoint and update center
+            fetch('/me')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.authenticated && data.location && data.location.lat && data.location.lng) {
+                        // Use user's office location
+                        map.setView([data.location.lat, data.location.lng], 12);
+                        console.log(`Routing map centered on user's location: ${data.location.name}`);
+                        
+                        // Add home/office icon at user's location
+                        const homeIcon = L.divIcon({
+                            html: '<div style="background: #3b82f6; color: white; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; font-size: 16px; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3);"><i class="fas fa-home"></i></div>',
+                            iconSize: [30, 30],
+                            iconAnchor: [15, 15],
+                            className: 'home-icon'
+                        });
+                        
+                        L.marker([data.location.lat, data.location.lng], {icon: homeIcon})
+                            .addTo(map)
+                            .bindPopup(`<strong>${data.location.name}</strong><br>${data.location.address}`);
+                    } else {
+                        console.log('Routing map centered on default Keller location');
+                    }
+                })
+                .catch(err => {
+                    console.log('Error getting user location, using default Keller:', err);
+                });
+        }
+        
+        // Initialize the map immediately
+        initMap();
+        
+        // Load user info and customers on page load
+        loadCurrentUser();
+        fetchCustomers();
 
         // 🧠 SaaS Route Optimization Functions
         async function optimizeRoutes() {
             const optimizeBtn = document.getElementById('optimizeBtn');
-            const statusEl = document.getElementById('optimizationStatus');
             
             optimizeBtn.disabled = true;
             optimizeBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Optimizing...';
-            statusEl.textContent = 'Optimizing...';
-            statusEl.style.background = '#fef3c7';
-            statusEl.style.color = '#92400e';
             
             try {
                 const res = await fetch("/optimize_routes", {method: "POST"});
@@ -494,9 +512,6 @@
                 if (data.status === 'success') {
                     currentSchedule = data.data;
                     updateMetrics(data.data.metrics);
-                    statusEl.textContent = 'Optimized';
-                    statusEl.style.background = '#dcfce7';
-                    statusEl.style.color = '#166534';
                     
                     // Show success message
                     showNotification('Routes optimized successfully!', 'success');
@@ -508,9 +523,6 @@
                 }
             } catch (error) {
                 console.error('Optimization error:', error);
-                statusEl.textContent = 'Error';
-                statusEl.style.background = '#fee2e2';
-                statusEl.style.color = '#dc2626';
                 showNotification('Optimization failed: ' + error.message, 'error');
             } finally {
                 optimizeBtn.disabled = false;
@@ -737,62 +749,253 @@
             territoryMarkers = [];
         }
 
-        // Add territory controls to the control panel
-        function addTerritoryControls() {
-            const controlPanel = document.querySelector('.control-panel');
-            const territoryControls = document.createElement('div');
-            territoryControls.style.cssText = `
-                margin-top: 1rem;
-                padding-top: 1rem;
-                border-top: 1px solid rgba(0,0,0,0.1);
-                display: flex;
-                gap: 0.5rem;
-                align-items: center;
-                flex-wrap: wrap;
-            `;
-            
-            territoryControls.innerHTML = `
-                <button id="showTerritoriesBtn" class="btn btn-secondary" style="background: var(--accent); color: white;">
-                    <i class="fas fa-map-marked-alt"></i> Show Territories
-                </button>
-                <button id="hideTerritoriesBtn" class="btn btn-secondary" style="background: var(--gray-500); color: white; display: none;">
-                    <i class="fas fa-eye-slash"></i> Hide Territories
-                </button>
-                <div style="margin-left: auto; display: flex; gap: 0.5rem; align-items: center;">
-                    <span style="font-size: 0.9rem; color: var(--text-secondary);">Technician Zones:</span>
-                    <span id="territoryStatus" style="padding: 0.25rem 0.75rem; background: var(--gray-100); border-radius: 20px; font-size: 0.85rem; color: var(--gray-600);">Hidden</span>
-                </div>
-            `;
-            
-            controlPanel.appendChild(territoryControls);
-            
-            // Add event listeners
-            document.getElementById('showTerritoriesBtn').addEventListener('click', async () => {
-                await loadTechnicianTerritories();
-                document.getElementById('showTerritoriesBtn').style.display = 'none';
-                document.getElementById('hideTerritoriesBtn').style.display = 'inline-block';
-                document.getElementById('territoryStatus').textContent = 'Visible';
-                document.getElementById('territoryStatus').style.background = '#dcfce7';
-                document.getElementById('territoryStatus').style.color = '#166534';
-            });
-            
-            document.getElementById('hideTerritoriesBtn').addEventListener('click', () => {
-                hideTerritories();
-                document.getElementById('showTerritoriesBtn').style.display = 'inline-block';
-                document.getElementById('hideTerritoriesBtn').style.display = 'none';
-                document.getElementById('territoryStatus').textContent = 'Hidden';
-                document.getElementById('territoryStatus').style.background = '#fee2e2';
-                document.getElementById('territoryStatus').style.color = '#dc2626';
-            });
-        }
-
         // Event listeners
-        document.getElementById('optimizeBtn').addEventListener('click', optimizeRoutes);
-        document.getElementById('showClustersBtn').addEventListener('click', showClusters);
-        document.getElementById('hideClustersBtn').addEventListener('click', hideClusters);
+        document.getElementById('showTerritoriesBtn').addEventListener('click', async () => {
+            await loadTechnicianTerritories();
+            document.getElementById('showTerritoriesBtn').style.display = 'none';
+            document.getElementById('hideTerritoriesBtn').style.display = 'inline-block';
+        });
+        
+        document.getElementById('hideTerritoriesBtn').addEventListener('click', () => {
+            hideTerritories();
+            document.getElementById('showTerritoriesBtn').style.display = 'inline-block';
+            document.getElementById('hideTerritoriesBtn').style.display = 'none';
+        });
+        
+        // Auto-generate routes on page load
+        setTimeout(generateDailyRoutes, 500);
 
-        // Initialize territory controls when page loads
-        addTerritoryControls();
+        // 🗓️ Daily Route Generation for Office Workers
+        async function generateDailyRoutes() {
+            const statusEl = document.getElementById('dailyRoutesStatus');
+            const container = document.getElementById('dailyRoutesContainer');
+            const list = document.getElementById('dailyRoutesList');
+            const summary = document.getElementById('dailyRoutesSummary');
+            
+            statusEl.textContent = 'Generating...';
+            statusEl.style.background = '#fef3c7';
+            statusEl.style.color = '#92400e';
+            
+            try {
+                const res = await fetch('/routing/daily-routes');
+                const data = await res.json();
+                
+                if (data.status === 'success') {
+                    // Display routes
+                    container.style.display = 'flex';
+                    dailyRoutesData = data.technician_routes;
+                    officeLocation = data.office_location;
+                    
+                    // Hide empty state
+                    document.getElementById('emptyRoutesState').style.display = 'none';
+                    summary.innerHTML = `
+                        <strong>${data.summary.total_technicians} techs</strong> | 
+                        <strong>${data.summary.total_customers_assigned} customers</strong> | 
+                        <strong>${data.summary.total_sqft.toLocaleString()} sqft</strong> | 
+                        <strong>$${data.summary.total_revenue.toLocaleString()}</strong>
+                    `;
+                    
+                    // Clear existing
+                    list.innerHTML = '';
+                    
+                    // Display each technician's route
+                    data.technician_routes.forEach(route => {
+                        const card = document.createElement('div');
+                        card.style.cssText = `
+                            background: var(--gray-50);
+                            border: 1px solid var(--gray-200);
+                            border-radius: 12px;
+                            padding: 1rem;
+                            border-left: 4px solid ${route.technician_color || '#3b82f6'};
+                        `;
+                        
+                        if (route.message) {
+                            // No route (territory not assigned, etc.)
+                            card.innerHTML = `
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <div>
+                                        <strong style="color: ${route.technician_color || '#3b82f6'};">
+                                            <i class="fas fa-user-hard-hat"></i> ${route.technician_name}
+                                        </strong>
+                                        <div style="color: var(--gray-500); font-size: 0.9rem; margin-top: 0.25rem;">
+                                            ${route.message}
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        } else {
+                            // Valid route
+                            const totalHours = Math.floor(route.total_time_minutes / 60);
+                            const totalMinutes = Math.round(route.total_time_minutes % 60);
+                            
+                            card.innerHTML = `
+                                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem;">
+                                    <div>
+                                        <strong style="color: ${route.technician_color || '#3b82f6'}; font-size: 1.1rem;">
+                                            <i class="fas fa-user-hard-hat"></i> ${route.technician_name}
+                                        </strong>
+                                        <div style="display: flex; gap: 1rem; margin-top: 0.5rem; font-size: 0.85rem; color: var(--gray-600);">
+                                            <span><i class="fas fa-users"></i> ${route.customer_count} customers</span>
+                                            <span><i class="fas fa-ruler-combined"></i> ${route.total_sqft.toLocaleString()} sqft</span>
+                                            <span><i class="fas fa-dollar-sign"></i> $${route.total_revenue.toLocaleString()}</span>
+                                            <span><i class="fas fa-road"></i> ${route.total_drive_miles} mi</span>
+                                            <span><i class="fas fa-clock"></i> ${totalHours}h ${totalMinutes}m</span>
+                                        </div>
+                                    </div>
+                                    <button onclick="viewTechnicianRoute(${route.technician_id}, '${route.technician_name}')" class="btn btn-sm" style="background: ${route.technician_color || '#3b82f6'}; color: white; padding: 0.5rem 1rem; border-radius: 6px; border: none; cursor: pointer;">
+                                        <i class="fas fa-map-marker-alt"></i> View Route
+                                    </button>
+                                </div>
+                                ${route.remaining_due > 0 ? `<div style="font-size: 0.85rem; color: #f59e0b; margin-bottom: 0.5rem;"><i class="fas fa-exclamation-triangle"></i> ${route.remaining_due} more due customers not assigned (capacity limit)</div>` : ''}
+                                <div style="font-size: 0.8rem; color: var(--gray-500);">
+                                    ${route.customers.map((c, i) => `
+                                        <div style="display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0;">
+                                            <span style="background: ${route.technician_color || '#3b82f6'}; color: white; width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: bold;">${i + 1}</span>
+                                            <span>${c.name}</span>
+                                            <span style="margin-left: auto; color: var(--gray-400);">${c.sqft.toLocaleString()} sqft</span>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            `;
+                        }
+                        
+                        list.appendChild(card);
+                    });
+                    
+                    statusEl.textContent = 'Generated';
+                    statusEl.style.background = '#dcfce7';
+                    statusEl.style.color = '#166534';
+                    
+                    // Draw routes on map
+                    drawDailyRoutesOnMap(data.technician_routes);
+                    
+                } else {
+                    throw new Error(data.message || 'Failed to generate routes');
+                }
+            } catch (error) {
+                console.error('Daily routes error:', error);
+                statusEl.textContent = 'Error';
+                statusEl.style.background = '#fee2e2';
+                statusEl.style.color = '#dc2626';
+            }
+        }
+        
+        function drawDailyRoutesOnMap(routes) {
+            console.log('Routes generated for', routes.length, 'technicians');
+            
+            // Clear existing route markers
+            routeMarkers.forEach(marker => {
+                if (map.hasLayer(marker)) {
+                    map.removeLayer(marker);
+                }
+            });
+            routeMarkers = [];
+            
+            // Just fit map to show all customer locations if there are any routes with customers
+            const allLatLngs = [];
+            routes.forEach(route => {
+                if (route.customers) {
+                    route.customers.forEach(c => {
+                        if (c.lat && c.lng) allLatLngs.push([c.lat, c.lng]);
+                    });
+                }
+            });
+            
+            if (allLatLngs.length > 0) {
+                const bounds = L.latLngBounds(allLatLngs);
+                map.fitBounds(bounds.pad(0.1));
+            }
+            
+            console.log('Map fitted to', allLatLngs.length, 'customer locations');
+        }
+        
+        function viewTechnicianRoute(technicianId, technicianName) {
+            // Clear previous route highlights
+            routeMarkers.forEach(marker => {
+                if (map.hasLayer(marker)) {
+                    map.removeLayer(marker);
+                }
+            });
+            routeMarkers = [];
+            
+            // Find the technician's route data
+            const route = dailyRoutesData?.find(r => r.technician_id === technicianId);
+            if (!route || !route.customers || route.customers.length === 0) {
+                showNotification('No route data for this technician', 'error');
+                return;
+            }
+            
+            const color = route.technician_color || '#3b82f6';
+            const latlngs = [];
+            
+            // Start from office
+            if (officeLocation && officeLocation.lat && officeLocation.lng) {
+                latlngs.push([officeLocation.lat, officeLocation.lng]);
+                
+                // Add office marker
+                const officeMarker = L.marker([officeLocation.lat, officeLocation.lng], {
+                    icon: L.divIcon({
+                        className: 'office-marker',
+                        html: `<div style="background: #000; color: white; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 0.9rem; border: 3px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.4);">OFFICE</div>`,
+                        iconSize: [32, 32],
+                        iconAnchor: [16, 16]
+                    }),
+                    zIndexOffset: 2000
+                }).addTo(map);
+                
+                officeMarker.bindPopup(`<div><strong>Office</strong><br>Start/End Point</div>`);
+                routeMarkers.push(officeMarker);
+            }
+            
+            // Add each customer stop
+            route.customers.forEach((customer, index) => {
+                if (!customer.lat || !customer.lng) return;
+                
+                latlngs.push([customer.lat, customer.lng]);
+                
+                // Add stop marker with letter (A, B, C...)
+                const letter = String.fromCharCode(65 + index); // A=65, B=66, etc
+                const marker = L.marker([customer.lat, customer.lng], {
+                    icon: L.divIcon({
+                        className: 'route-stop-marker',
+                        html: `<div style="background: ${color}; color: white; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 0.9rem; border: 3px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.4);">${letter}</div>`,
+                        iconSize: [28, 28],
+                        iconAnchor: [14, 14]
+                    }),
+                    zIndexOffset: 1000
+                }).addTo(map);
+                
+                marker.bindPopup(`
+                    <div style="min-width: 180px;">
+                        <strong style="font-size: 1.1rem;">${customer.name}</strong><br>
+                        <span style="color: ${color};">●</span> ${technicianName}<br>
+                        <strong>Stop ${letter}</strong> (${index + 1} of ${route.customers.length})<br>
+                        ${customer.sqft.toLocaleString()} sqft | $${customer.actual_price || 0}
+                    </div>
+                `);
+                
+                routeMarkers.push(marker);
+            });
+            
+            // Draw the route path (office -> A -> B -> C...)
+            if (latlngs.length > 1) {
+                const polyline = L.polyline(latlngs, {
+                    color: '#000000',  // Black line
+                    weight: 4,
+                    opacity: 0.9,
+                    lineCap: 'round',
+                    lineJoin: 'round'
+                }).addTo(map);
+                
+                routeMarkers.push(polyline);
+                
+                // Fit map to show the route
+                const group = new L.featureGroup(routeMarkers);
+                map.fitBounds(group.getBounds().pad(0.15));
+                
+                showNotification(`Showing route for ${technicianName}: ${route.customers.length} stops`, 'success');
+            }
+        }
 
         // Add CSS animations
         const style = document.createElement('style');
@@ -817,6 +1020,10 @@
                 const data = await res.json();
                 const customers = data.customers || [];
 
+                // Update Due Today count
+                const dueCount = customers.filter(c => c[8] === "due").length;
+                document.getElementById("dueTodayCount").textContent = dueCount;
+
                 console.log("ALL customers (will all get pins):", customers);
 
                 // Clear any existing markers
@@ -825,72 +1032,6 @@
                         map.removeLayer(layer);
                     }
                 });
-
-                // Update the "due" list UI (still only due ones)
-                const dueCount = document.getElementById("dueCount");
-                const dueCustomersContainer = document.getElementById("dueCustomers");
-                const dueEmpty = document.getElementById("dueEmpty");
-
-                const due = customers.filter(c => c[8] === "due");
-                dueCount.textContent = due.length;
-
-                if (due.length === 0) {
-                    dueEmpty.textContent = "No customers are due service right now.";
-                    dueCustomersContainer.innerHTML = "";
-                } else {
-                    dueEmpty.remove();
-                    dueCustomersContainer.innerHTML = due.map((c) => {
-                        const name    = c[0];
-                        const address = c[1];
-                        const sqft    = c[3];
-                        const rowid   = c[9];
-
-                        return `
-                            <div class="customer-due-row">
-                                <input type="checkbox" id="customer-${rowid}" data-rowid="${rowid}" data-sqft="${sqft}">
-                                <label for="customer-${rowid}">
-                                    <strong>${name}</strong><br>
-                                    <span>${address}</span>
-                                </label>
-                                <span class="days-since">
-                                    ${sqft.toLocaleString()} sqft
-                                </span>
-                            </div>
-                        `;
-                    }).join("");
-                }
-
-                // Update the "not due" list UI
-                const notDueCustomersContainer = document.getElementById("notDueCustomers");
-                const notDueEmpty = document.getElementById("notDueEmpty");
-
-                const notDue = customers.filter(c => c[8] !== "due");
-
-                if (notDue.length === 0) {
-                    notDueEmpty.textContent = "No customers not due yet.";
-                    notDueCustomersContainer.innerHTML = "";
-                } else {
-                    notDueEmpty.remove();
-                    notDueCustomersContainer.innerHTML = notDue.map((c) => {
-                        const name    = c[0];
-                        const address = c[1];
-                        const sqft    = c[3];
-                        const rowid   = c[9];
-
-                        return `
-                            <div class="customer-due-row">
-                                <input type="checkbox" id="customer-${rowid}" data-rowid="${rowid}" data-sqft="${sqft}">
-                                <label for="customer-${rowid}">
-                                    <strong>${name}</strong><br>
-                                    <span>${address}</span>
-                                </label>
-                                <span class="days-since">
-                                    ${sqft.toLocaleString()} sqft
-                                </span>
-                            </div>
-                        `;
-                    }).join("");
-                }
 
                 // Add a pin for EVERY customer (blue by default, red if due)
                 customers.forEach((c) => {
@@ -946,35 +1087,10 @@
 
             } catch (e) {
                 console.error("Error fetching customers or adding markers:", e);
-                const dueEmpty = document.getElementById("dueEmpty");
-                if (dueEmpty) {
-                    dueEmpty.textContent = "Error loading customers.";
-                }
             }
         }
 
-        // Build Route from selected customers - FIXED
-        function setupBuildRouteButton() {
-            const btn = document.getElementById("buildRoute");
-
-            btn.addEventListener("click", async () => {
-                const selected = Array.from(document.querySelectorAll('input[type="checkbox"]:checked')).reverse().map(cb => ({
-                    rowid: parseInt(cb.dataset.rowid), 
-                    sqft: parseInt(cb.dataset.sqft)
-                }));
-                if (selected.length > 0) {
-                    await fetch("/build_route", {method: "POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({route:selected})});
-                }
-                window.location.href = "/Route_Printing.html";
-            });
-        }
-
-        // Initialize on page load
-        fetchCustomers();
-        setupBuildRouteButton();
-        loadCurrentUser();
-
-        // Load current user info
+        // Load current user info and center map on their location
         async function loadCurrentUser() {
             try {
                 const res = await fetch('/me');
@@ -989,11 +1105,13 @@
                         userLocationEl.textContent = data.username || '';
                     } else if (data.user_type === 'office_worker') {
                         userNameEl.textContent = data.worker_name || data.username;
-                        // Fetch location name
-                        const locRes = await fetch('/locations');
-                        const locData = await locRes.json();
-                        const location = locData.locations?.find(l => l.id === data.location_id);
-                        userLocationEl.textContent = location?.name || '';
+                        userLocationEl.textContent = data.location_name || '';
+                        
+                        // Center map on user's location if coordinates available
+                        if (data.location_lat && data.location_lng) {
+                            map.setView([data.location_lat, data.location_lng], 12);
+                            console.log('Map centered on', data.location_name, [data.location_lat, data.location_lng]);
+                        }
                     }
                 }
             } catch (e) {

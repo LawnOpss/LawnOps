@@ -21,8 +21,18 @@ STATIC_DIR = os.path.join(BASE_DIR, "static")
 # ========== Geocodio Helper ==========
 def geocode_geocodio(address):
     base_url = "https://api.geocod.io/v1.6/geocode"
+    
+    # Improve address formatting for better accuracy
+    formatted_address = address.strip()
+    
+    # Add "United States" if not already present and address looks incomplete
+    if not any(state in formatted_address.upper() for state in ['TX', 'GA', 'NC', 'SC', 'TN', 'TEXAS', 'GEORGIA', 'NORTH CAROLINA', 'SOUTH CAROLINA', 'TENNESSEE']):
+        # If no state is mentioned, try to be more specific
+        if 'united states' not in formatted_address.lower():
+            formatted_address += ", United States"
+    
     params = {
-        "q": address,
+        "q": formatted_address,
         "api_key": GEOCODIO_API_KEY,
         "country": "US"
     }
@@ -31,9 +41,10 @@ def geocode_geocodio(address):
         data = res.json()
         if data.get("results"):
             loc = data["results"][0]["location"]
+            print(f"Geocoded '{formatted_address}' to ({loc['lat']}, {loc['lng']})")
             return loc["lat"], loc["lng"]
         else:
-            print("No results from Geocodio for:", address)
+            print("No results from Geocodio for:", formatted_address)
     except Exception as e:
         print("Geocodio error:", e)
     return None, None
@@ -566,6 +577,33 @@ except sqlite3.OperationalError:
     # Already exists, safe to ignore
     pass
 
+# ADD lat/lng columns to locations table for route optimization
+try:
+    cursor.execute("ALTER TABLE locations ADD COLUMN lat REAL")
+    conn.commit()
+except sqlite3.OperationalError:
+    pass
+
+try:
+    cursor.execute("ALTER TABLE locations ADD COLUMN lng REAL")
+    conn.commit()
+except sqlite3.OperationalError:
+    pass
+
+# ADD location_id column to customers table for multi-location support
+try:
+    cursor.execute("ALTER TABLE customers ADD COLUMN location_id INTEGER DEFAULT NULL")
+    conn.commit()
+except sqlite3.OperationalError:
+    pass
+
+# ADD location_id column to technicians table for multi-location support
+try:
+    cursor.execute("ALTER TABLE technicians ADD COLUMN location_id INTEGER DEFAULT NULL")
+    conn.commit()
+except sqlite3.OperationalError:
+    pass
+
 app = FastAPI()
 
 # Session middleware for login (browser session only - closes when tab closes)
@@ -578,8 +616,8 @@ app.add_middleware(
 )
 
 # Simple hardcoded credentials - change these!
-USERNAME = "alan"
-PASSWORD = "newell"
+USERNAME = "123456"
+PASSWORD = "123456"
 
 def require_auth(request: Request):
     """Dependency to check if user is logged in"""
@@ -1113,7 +1151,7 @@ async def check_auth(request: Request):
 
 @app.get("/me")
 async def get_current_user(request: Request):
-    """Get current logged-in user info"""
+    """Get current logged-in user info with location details"""
     if not request.session.get('logged_in'):
         return {"authenticated": False}
     
@@ -1128,7 +1166,26 @@ async def get_current_user(request: Request):
     
     if user_type == 'office_worker':
         response['worker_name'] = request.session.get('worker_name', '')
-        response['location_id'] = request.session.get('location_id')
+        location_id = request.session.get('location_id')
+        response['location_id'] = location_id
+        
+        # Get location details for map centering
+        if location_id:
+            conn = sqlite3.connect('database.db')
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT name, address, lat, lng FROM locations WHERE id = ?",
+                (location_id,)
+            )
+            loc = cursor.fetchone()
+            conn.close()
+            if loc:
+                response['location'] = {
+                    'name': loc[0],
+                    'address': loc[1],
+                    'lat': loc[2],
+                    'lng': loc[3]
+                }
     
     return response
 
@@ -1167,28 +1224,56 @@ async def read_analytics(request: Request):
 def get_customers(request: Request):
     if not request.session.get('logged_in'):
         return RedirectResponse(url="/login")
-    # Create a new connection for each request to avoid cursor recursion
+    
+    # Get user's location_id (for office workers)
+    location_id = request.session.get('location_id')
+
     conn = sqlite3.connect('database.db')
     cursor = conn.cursor()
     try:
-        cursor.execute("""
-            SELECT 
-                COALESCE(name, ''), 
-                COALESCE(address, ''), 
-                COALESCE(phone, ''), 
-                COALESCE(sqft, 0), 
-                COALESCE(monthly_min, 0), 
-                COALESCE(monthly_max, 0),
-                COALESCE(notes, ''),
-                last_service_date,
-                rowid,
-                lat,
-                lng,
-                actual_price,
-                measurement_data
-            FROM customers 
-            ORDER BY CASE WHEN last_service_date IS NULL THEN 0 ELSE 1 END, last_service_date ASC
-        """)
+        # If office worker with location, filter by location
+        if location_id:
+            cursor.execute("""
+                SELECT 
+                    COALESCE(name, ''), 
+                    COALESCE(address, ''), 
+                    COALESCE(phone, ''), 
+                    COALESCE(sqft, 0), 
+                    COALESCE(monthly_min, 0), 
+                    COALESCE(monthly_max, 0),
+                    COALESCE(notes, ''),
+                    last_service_date,
+                    rowid,
+                    lat,
+                    lng,
+                    actual_price,
+                    measurement_data,
+                    location_id
+                FROM customers 
+                WHERE location_id = ? OR location_id IS NULL
+                ORDER BY CASE WHEN last_service_date IS NULL THEN 0 ELSE 1 END, last_service_date ASC
+            """, (location_id,))
+        else:
+            # Admin sees all customers
+            cursor.execute("""
+                SELECT 
+                    COALESCE(name, ''), 
+                    COALESCE(address, ''), 
+                    COALESCE(phone, ''), 
+                    COALESCE(sqft, 0), 
+                    COALESCE(monthly_min, 0), 
+                    COALESCE(monthly_max, 0),
+                    COALESCE(notes, ''),
+                    last_service_date,
+                    rowid,
+                    lat,
+                    lng,
+                    actual_price,
+                    measurement_data,
+                    location_id
+                FROM customers 
+                ORDER BY CASE WHEN last_service_date IS NULL THEN 0 ELSE 1 END, last_service_date ASC
+            """)
         rows = cursor.fetchall()
     except Exception as e:
         print(f"Database error in get_customers: {e}")
@@ -1211,7 +1296,8 @@ def get_customers(request: Request):
             lat,
             lng,
             actual_price,
-            measurement_data
+            measurement_data,
+            location_id
         ) = row
 
         if last_service_date:
@@ -1220,7 +1306,6 @@ def get_customers(request: Request):
         else:
             days_since = 9999  # never serviced
 
-                # FIXED: New sales OR 45+ days since service = "due"
         is_due = (last_service_date is None) or (days_since >= 45)
         status = "due" if is_due else "not_due"
 
@@ -1234,12 +1319,13 @@ def get_customers(request: Request):
                 monthly_max,
                 notes,
                 last_service_date,
-                status,     # c[8]
-                rowid,      # c[9]
-                lat,        # c[10]
-                lng,        # c[11]
-                actual_price, # c[12]
-                measurement_data # c[13]
+                status,
+                rowid,
+                lat,
+                lng,
+                actual_price,
+                measurement_data,
+                location_id
             )
         )
 
@@ -1249,6 +1335,7 @@ def get_customers(request: Request):
 
 @app.post("/add_customer")
 def add_customer(
+    request: Request,
     name: str = Form(...),
     address: str = Form(...),
     phone: str = Form(...),
@@ -1261,16 +1348,17 @@ def add_customer(
     lng = None
 
     # Use full address, Geocodio will handle it
-    full_address = f"{address}, Texas, United States"
+    lat, lng = geocode_geocodio(address)
+    
+    # Get the office worker's location_id
+    location_id = request.session.get('location_id')
 
-    lat, lng = geocode_geocodio(full_address)
-
-    # Insert customer with last_service_date = NULL → new sale → immediately due in get_customers
+    # Insert customer with location_id
     cursor.execute("""
         INSERT INTO customers
-            (name, address, phone, sqft, monthly_min, monthly_max, notes, last_service_date, lat, lng)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (name, address, phone, sqft, monthly_min, monthly_max, notes, None, lat, lng))
+            (name, address, phone, sqft, monthly_min, monthly_max, notes, last_service_date, lat, lng, location_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (name, address, phone, sqft, monthly_min, monthly_max, notes, None, lat, lng, location_id))
     conn.commit()
     new_rowid = cursor.lastrowid
     return {"status": "success", "name": name, "rowid": new_rowid}
@@ -1335,19 +1423,17 @@ def save_measurement(rowid: int = Form(...), measurement_data: str = Form(...), 
         return {"status": "error", "message": str(e)}
 
 
-@app.get("/geocode_missing")
 def geocode_missing():
     cursor.execute("SELECT rowid, address FROM customers WHERE lat IS NULL OR lng IS NULL")
     rows = cursor.fetchall()
     count = 0
     for rowid, address in rows:
         # Use full address
-        full = f"{address}, Texas, United States"
-        lat, lng = geocode_geocodio(full)
+        lat, lng = geocode_geocodio(address)
         if lat is not None and lng is not None:
             cursor.execute(
-                "UPDATE customers SET lat = ?, lng = ?, address = ? WHERE rowid = ?",
-                (lat, lng, full, rowid)
+                "UPDATE customers SET lat = ?, lng = ? WHERE rowid = ?",
+                (lat, lng, rowid)
             )
             conn.commit()
             print(f"Updated {full} -> {lat}, {lng}")
@@ -1714,19 +1800,34 @@ def delete_technician(technician_id: int):
         return {"status": "error", "message": f"Failed to delete technician: {str(e)}"}
 
 @app.get("/technician_territories")
-def get_technician_territories():
-    """Get all technician territories for map visualization"""
+def get_technician_territories(request: Request):
+    """Get all technician territories for map visualization - filtered by user's location"""
     try:
+        # Get user's location_id (for office workers)
+        location_id = request.session.get('location_id')
+        
         # Use the correct database file
         conn = sqlite3.connect('database.db')
         cursor = conn.cursor()
-        cursor.execute("""
-            SELECT tt.id, tt.technician_id, tt.territory_name, tt.center_lat, tt.center_lng,
-                   tt.radius_miles, tt.polygon_coords, t.name as technician_name, t.color_hex
-            FROM technician_territories tt
-            JOIN technicians t ON tt.technician_id = t.id
-            WHERE t.is_active = 1
-        """)
+        
+        if location_id:
+            # Office workers only see territories for their location
+            cursor.execute("""
+                SELECT tt.id, tt.technician_id, tt.territory_name, tt.center_lat, tt.center_lng,
+                       tt.radius_miles, tt.polygon_coords, t.name as technician_name, t.color_hex
+                FROM technician_territories tt
+                JOIN technicians t ON tt.technician_id = t.id
+                WHERE t.is_active = 1 AND t.location_id = ?
+            """, (location_id,))
+        else:
+            # Admin sees all territories
+            cursor.execute("""
+                SELECT tt.id, tt.technician_id, tt.territory_name, tt.center_lat, tt.center_lng,
+                       tt.radius_miles, tt.polygon_coords, t.name as technician_name, t.color_hex
+                FROM technician_territories tt
+                JOIN technicians t ON tt.technician_id = t.id
+                WHERE t.is_active = 1
+            """)
         territories = cursor.fetchall()
         conn.close()
         
@@ -1828,30 +1929,13 @@ def auto_assign_territories(location_id: int = Form(...), radius: int = Form(...
         return {
             "status": "success", 
             "message": f"Created {num_technicians} pie-slice territories for {location[0]}",
-            "location_center": location_coords
         }
     except Exception as e:
         return {"status": "error", "message": f"Failed to auto-assign territories: {str(e)}"}
 
 def geocode_address(address: str):
-    """Simple geocoding - returns coordinates for known addresses"""
-    address_lower = address.lower().strip()
-    
-    # Known locations with better coordinates
-    if 'keller' in address_lower or 'egg farm' in address_lower:
-        # Keller, Texas coordinates (more accurate for your location)
-        return (32.9346, -97.2251)
-    elif 'dallas' in address_lower:
-        return (32.7767, -96.7970)
-    elif 'fort worth' in address_lower:
-        return (32.7555, -97.3308)
-    elif 'arlington' in address_lower:
-        return (32.7357, -97.1081)
-    elif 'plano' in address_lower:
-        return (33.0198, -96.6989)
-    else:
-        # Default to Keller for unknown addresses (since that's your main location)
-        return (32.9346, -97.2251)
+    """Geocoding using Geocodio API"""
+    return geocode_geocodio(address)
 
 @app.post("/technician_territories/custom")
 def create_custom_territory(
@@ -2243,11 +2327,20 @@ def get_locations():
 
 @app.post("/locations")
 def create_location(name: str = Form(...), address: str = Form(default=""), service_area_zips: str = Form(default=""), phone: str = Form(default="")):
-    """Create a new location"""
+    """Create a new location with automatic geocoding"""
     try:
+        # Geocode the address to get lat/lng
+        lat = None
+        lng = None
+        if address:
+            try:
+                lat, lng = geocode_geocodio(address)
+            except Exception as e:
+                print(f"Geocoding failed for address '{address}': {e}")
+        
         cursor.execute(
-            "INSERT INTO locations (name, address, service_area_zips, phone) VALUES (?, ?, ?, ?)",
-            (name, address, service_area_zips, phone)
+            "INSERT INTO locations (name, address, service_area_zips, phone, lat, lng) VALUES (?, ?, ?, ?, ?, ?)",
+            (name, address, service_area_zips, phone, lat, lng)
         )
         conn.commit()
         loc_id = cursor.lastrowid
@@ -2260,11 +2353,25 @@ def create_location(name: str = Form(...), address: str = Form(default=""), serv
 
 @app.post("/locations/{location_id}")
 def update_location(location_id: int, name: str = Form(...), address: str = Form(default=""), service_area_zips: str = Form(default=""), phone: str = Form(default="")):
-    """Update a location"""
+    """Update a location with automatic geocoding if address changes"""
     try:
+        # Check if address is being updated
+        cursor.execute("SELECT address FROM locations WHERE id = ?", (location_id,))
+        current_address = cursor.fetchone()
+        
+        # Geocode the new address to get lat/lng if address changed
+        lat = None
+        lng = None
+        if address and (not current_address or current_address[0] != address):
+            try:
+                lat, lng = geocode_geocodio(address)
+                print(f"Geocoded updated address '{address}' to {lat}, {lng}")
+            except Exception as e:
+                print(f"Geocoding failed for address '{address}': {e}")
+        
         cursor.execute(
-            "UPDATE locations SET name = ?, address = ?, service_area_zips = ?, phone = ? WHERE id = ?",
-            (name, address, service_area_zips, phone, location_id)
+            "UPDATE locations SET name = ?, address = ?, service_area_zips = ?, phone = ?, lat = ?, lng = ? WHERE id = ?",
+            (name, address, service_area_zips, phone, lat, lng, location_id)
         )
         conn.commit()
         if cursor.rowcount > 0:
@@ -2719,5 +2826,255 @@ def get_office_dashboard(request: Request, days: int = 30):
             "completed": completed,
             "rescheduled": rescheduled
         }
+        
     except Exception as e:
         return {"error": str(e)}
+
+
+# ====== OFFICE WORKER DAILY ROUTE OPTIMIZATION ======
+
+import math
+
+def haversine_distance(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
+    """Calculate straight-line distance between two points in miles"""
+    R = 3959  # Earth's radius in miles
+    
+    lat1_rad = math.radians(lat1)
+    lat2_rad = math.radians(lat2)
+    delta_lat = math.radians(lat2 - lat1)
+    delta_lng = math.radians(lng2 - lng1)
+    
+    a = math.sin(delta_lat/2)**2 + math.cos(lat1_rad) * math.cos(lat2_rad) * math.sin(delta_lng/2)**2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
+    
+    return R * c
+
+def point_in_polygon(lat: float, lng: float, polygon_coords: list) -> bool:
+    """Check if a point is inside a polygon using ray casting algorithm
+    Note: polygon_coords is stored as [lat, lng] pairs, but algorithm needs [x, y] = [lng, lat]
+    """
+    n = len(polygon_coords)
+    inside = False
+    
+    j = n - 1
+    for i in range(n):
+        # Swap: stored as [lat, lng], but algorithm needs [x, y] = [lng, lat]
+        yi, xi = polygon_coords[i]  # lat, lng
+        yj, xj = polygon_coords[j]  # lat, lng
+        
+        if ((yi > lat) != (yj > lat)) and (lng < (xj - xi) * (lat - yi) / (yj - yi) + xi):
+            inside = not inside
+        j = i
+    
+    return inside
+
+@app.get("/routing/daily-routes")
+def get_daily_routes(request: Request, location_id: int = None, date: str = None):
+    """
+    Generate optimized daily routes for all technicians at a location.
+    Office workers see their assigned location only, admins can specify location.
+    """
+    if not request.session.get('logged_in'):
+        return {"status": "error", "message": "Not authenticated"}
+    
+    user_type = request.session.get('user_type')
+    user_location_id = request.session.get('location_id')
+    
+    if user_type == 'office_worker':
+        target_location = user_location_id
+    else:
+        target_location = location_id
+    
+    if not target_location:
+        return {"status": "error", "message": "Location required"}
+    
+    try:
+        # Get office location coordinates
+        cursor.execute("SELECT lat, lng, address FROM locations WHERE id = ?", (target_location,))
+        loc_data = cursor.fetchone()
+        
+        if not loc_data:
+            return {"status": "error", "message": "Office location not found"}
+        
+        office_lat, office_lng, office_address = loc_data
+        
+        if not office_lat or not office_lng:
+            # Fallback: geocode the address
+            office_lat, office_lng = geocode_address(office_address or "Keller, TX")
+        
+        # Get all active technicians at this location with their territories
+        cursor.execute("""
+            SELECT t.id, t.name, t.color_hex, tt.polygon_coords
+            FROM technicians t
+            LEFT JOIN technician_territories tt ON t.id = tt.technician_id
+            WHERE t.location_id = ? AND t.is_active = 1
+        """, (target_location,))
+        
+        technicians = cursor.fetchall()
+        
+        if not technicians:
+            return {"status": "error", "message": "No active technicians at this location"}
+        
+        # Generate routes for each technician
+        daily_routes = []
+        
+        for tech in technicians:
+            tech_id, tech_name, tech_color, polygon_coords = tech
+            
+            if not polygon_coords:
+                daily_routes.append({
+                    "technician_id": tech_id,
+                    "technician_name": tech_name,
+                    "technician_color": tech_color,
+                    "customers": [],
+                    "message": "No territory assigned"
+                })
+                continue
+            
+            try:
+                coords = json.loads(polygon_coords)
+            except:
+                daily_routes.append({
+                    "technician_id": tech_id,
+                    "technician_name": tech_name,
+                    "technician_color": tech_color,
+                    "customers": [],
+                    "message": "Invalid territory data"
+                })
+                continue
+            
+            # Get due customers in this technician's territory (45+ days like the rest of the app)
+            cursor.execute("""
+                SELECT 
+                    c.id, c.name, c.address, c.sqft, c.actual_price, 
+                    c.lat, c.lng, c.last_service_date,
+                    julianday('now') - julianday(c.last_service_date) as days_since_service
+                FROM customers c
+                WHERE c.location_id = ? AND c.lat IS NOT NULL AND c.lng IS NOT NULL
+                    AND (c.last_service_date IS NULL OR julianday('now') - julianday(c.last_service_date) > 45)
+            """, (target_location,))
+            
+            all_due_customers = cursor.fetchall()
+            print(f"Tech {tech_name}: Found {len(all_due_customers)} total due customers at location {target_location}")
+            print(f"Tech {tech_name}: Territory coords: {coords[:3] if coords else 'none'}...")
+            
+            customers = []
+            for row in all_due_customers:
+                lat, lng = row[5], row[6]
+                print(f"  Checking {row[1]} at ({lat}, {lng}) in polygon...")
+                in_poly = point_in_polygon(lat, lng, coords)
+                print(f"    -> point_in_polygon result: {in_poly}")
+                if in_poly:
+                    customers.append({
+                        "id": row[0],
+                        "name": row[1],
+                        "address": row[2],
+                        "sqft": row[3] or 0,
+                        "actual_price": row[4] or 0,
+                        "lat": row[5],
+                        "lng": row[6],
+                        "days_since_service": row[8] or 999
+                    })
+            
+            print(f"Tech {tech_name}: {len(customers)} customers in territory")
+            
+            # Sort by days since service (most overdue first)
+            customers.sort(key=lambda x: x["days_since_service"], reverse=True)
+            
+            # Optimize route with capacity constraints (200k sqft or $1500)
+            MAX_SQFT = 200000
+            MAX_REVENUE = 1500.0
+            
+            route = []
+            total_sqft = 0
+            total_revenue = 0
+            current_lat = office_lat
+            current_lng = office_lng
+            
+            remaining = customers.copy()
+            
+            while remaining:
+                # Find nearest customer
+                nearest_idx = None
+                nearest_dist = float('inf')
+                
+                for i, customer in enumerate(remaining):
+                    dist = haversine_distance(current_lat, current_lng, customer["lat"], customer["lng"])
+                    if dist < nearest_dist:
+                        nearest_dist = dist
+                        nearest_idx = i
+                
+                if nearest_idx is None:
+                    break
+                
+                customer = remaining[nearest_idx]
+                
+                # Check capacity constraints
+                new_sqft = total_sqft + customer["sqft"]
+                new_revenue = total_revenue + customer["actual_price"]
+                
+                if new_sqft > MAX_SQFT or new_revenue > MAX_REVENUE:
+                    break
+                
+                # Add to route with metrics
+                customer["drive_miles"] = round(nearest_dist, 2)
+                customer["drive_minutes"] = round((nearest_dist / 30) * 60, 1)
+                customer["service_minutes"] = round(customer["sqft"] / 1000, 1)
+                
+                route.append(customer)
+                total_sqft = new_sqft
+                total_revenue = new_revenue
+                
+                current_lat = customer["lat"]
+                current_lng = customer["lng"]
+                remaining.pop(nearest_idx)
+            
+            # Calculate totals including return to office
+            total_drive_miles = sum(c["drive_miles"] for c in route)
+            total_service_minutes = sum(c["service_minutes"] for c in route)
+            total_drive_minutes = sum(c["drive_minutes"] for c in route)
+            
+            if route:
+                return_dist = haversine_distance(current_lat, current_lng, office_lat, office_lng)
+                total_drive_miles += round(return_dist, 2)
+                total_drive_minutes += round((return_dist / 30) * 60, 1)
+            
+            daily_routes.append({
+                "technician_id": tech_id,
+                "technician_name": tech_name,
+                "technician_color": tech_color,
+                "customers": route,
+                "total_sqft": total_sqft,
+                "total_revenue": round(total_revenue, 2),
+                "total_drive_miles": round(total_drive_miles, 2),
+                "total_service_minutes": round(total_service_minutes, 1),
+                "total_drive_minutes": round(total_drive_minutes, 1),
+                "total_time_minutes": round(total_service_minutes + total_drive_minutes, 1),
+                "customer_count": len(route),
+                "remaining_due": len(remaining)
+            })
+        
+        # Calculate summary
+        all_customers = sum(r["customer_count"] for r in daily_routes)
+        total_sqft = sum(r["total_sqft"] for r in daily_routes)
+        total_revenue = sum(r["total_revenue"] for r in daily_routes)
+        
+        return {
+            "status": "success",
+            "location_id": target_location,
+            "date": date or datetime.now().strftime("%Y-%m-%d"),
+            "office_location": {"lat": office_lat, "lng": office_lng},
+            "technician_routes": daily_routes,
+            "summary": {
+                "total_technicians": len(daily_routes),
+                "total_customers_assigned": all_customers,
+                "total_sqft": total_sqft,
+                "total_revenue": round(total_revenue, 2)
+            }
+        }
+        
+    except Exception as e:
+        import traceback
+        print(f"Daily routes error: {e}")
+        traceback.print_exc()
+        return {"status": "error", "message": str(e)}

@@ -1149,8 +1149,28 @@
             }
 
             function initMeasurementMap() {
-                // Default to Keller, TX
-                measureMap = L.map('measurementMap').setView([32.9346, -97.2251], 16);
+                // Get user location from session, default to Keller if not available
+                let defaultCenter = [32.9346, -97.2251]; // Default to Keller
+                let defaultZoom = 16;
+                
+                // Create map with default center first
+                measureMap = L.map('measurementMap').setView(defaultCenter, defaultZoom);
+                
+                // Try to get user's location from /me endpoint and update center
+                fetch('/me')
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.authenticated && data.location && data.location.lat && data.location.lng) {
+                            // Use user's office location
+                            measureMap.setView([data.location.lat, data.location.lng], defaultZoom);
+                            console.log(`Measurement map centered on user's location: ${data.location.name}`);
+                        } else {
+                            console.log('Measurement map centered on default Keller location');
+                        }
+                    })
+                    .catch(err => {
+                        console.log('Error getting user location, using default Keller:', err);
+                    });
                 
                 L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
                     attribution: 'Tiles © Esri',
@@ -1161,6 +1181,25 @@
                 L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
                     maxZoom: 22
                 }).addTo(measureMap);
+
+                // Add home/office icon at user's location
+                fetch('/me')
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.authenticated && data.location && data.location.lat && data.location.lng) {
+                            const homeIcon = L.divIcon({
+                                html: '<div style="background: #3b82f6; color: white; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; font-size: 16px; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3);"><i class="fas fa-home"></i></div>',
+                                iconSize: [30, 30],
+                                iconAnchor: [15, 15],
+                                className: 'home-icon'
+                            });
+                            
+                            L.marker([data.location.lat, data.location.lng], {icon: homeIcon})
+                                .addTo(measureMap)
+                                .bindPopup(`<strong>${data.location.name}</strong><br>${data.location.address}`);
+                        }
+                    })
+                    .catch(err => console.log('Could not add home icon:', err));
 
                 // Add click handler for drawing
                 measureMap.on('click', function(e) {

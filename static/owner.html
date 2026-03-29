@@ -768,9 +768,17 @@
 
         <!-- Technicians List -->
         <div style="margin-top: 2rem;">
-          <h3 style="margin-bottom: 1rem; color: var(--text-primary);">
-            <i class="fas fa-list"></i> Technicians
-          </h3>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h3 style="margin: 0; color: var(--text-primary);">
+              <i class="fas fa-list"></i> Technicians
+            </h3>
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+              <label style="font-weight: 600; color: #374151;">Filter by Location:</label>
+              <select id="technicianLocationFilter" style="padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px; background: white;">
+                <option value="">All Locations</option>
+              </select>
+            </div>
+          </div>
           <div id="techniciansList" style="display: grid; gap: 1rem;"></div>
         </div>
       </div>
@@ -816,9 +824,17 @@
 
         <!-- Office Workers List -->
         <div style="margin-top: 2rem;">
-          <h3 style="margin-bottom: 1rem; color: var(--text-primary);">
-            <i class="fas fa-list"></i> Office Staff
-          </h3>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h3 style="margin: 0; color: var(--text-primary);">
+              <i class="fas fa-list"></i> Office Staff
+            </h3>
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+              <label style="font-weight: 600; color: #374151;">Filter by Location:</label>
+              <select id="officeWorkerLocationFilter" style="padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px; background: white;">
+                <option value="">All Locations</option>
+              </select>
+            </div>
+          </div>
           <div id="officeWorkersList" style="display: grid; gap: 1rem;"></div>
         </div>
       </div>
@@ -877,6 +893,12 @@
       condCodeIds: {},  // "code_name" -> id
       chemAutoIds: {}   // "chemical_name" -> id
     };
+
+    // Location filtering variables
+    let currentUserLocationId = null;
+    let currentUserLocation = null;
+    let locations = [];
+    let technicians = [];
 
     async function loadAllData() {
       try {
@@ -1392,8 +1414,6 @@
     }
 
     // ============ OFFICE LOCATIONS MANAGEMENT ============
-    let locations = [];
-
     async function loadLocations() {
       try {
         const res = await fetch(`${API_BASE}/locations`);
@@ -1536,28 +1556,36 @@
     }
 
     // ============ TECHNICIANS MANAGEMENT ============
-    let technicians = [];
-
     async function loadTechnicians() {
       try {
         const res = await fetch(`${API_BASE}/technicians`);
         const data = await res.json();
         technicians = data.technicians || [];
-        renderTechniciansList();
+        
+        // Apply location filtering for non-admin users
+        if (currentUserLocationId) {
+          const filteredTechnicians = technicians.filter(t => t.location_id === currentUserLocationId);
+          renderTechniciansList(filteredTechnicians);
+        } else {
+          renderTechniciansList(); // Admin sees all
+        }
+        
         populateLocationSelects();
       } catch (e) {
         console.error("Load technicians error:", e);
       }
     }
 
-    function renderTechniciansList() {
+    function renderTechniciansList(technicianList = technicians) {
       const container = document.getElementById("techniciansList");
-      if (!technicians || technicians.length === 0) {
+      const displayList = technicianList || technicians;
+      
+      if (!displayList || displayList.length === 0) {
         container.innerHTML = '<p style="color: #9ca3af;">No technicians added yet. Add one above to get started.</p>';
         return;
       }
 
-      container.innerHTML = technicians.map(tech => `
+      container.innerHTML = displayList.map(tech => `
         <div class="location-card">
           <div class="location-info">
             <div class="location-name" style="display: flex; align-items: center; gap: 0.5rem;">
@@ -1606,56 +1634,18 @@
           }
         }
       });
-    }
-
-    function populateTechnicianSelect() {
-      const select = document.getElementById("drawingTechnician");
-      select.innerHTML = '<option value="">Select technician...</option>';
-
-      // Debug logging
-      console.log('=== POPULATE TECHNICIAN SELECT ===');
-      console.log('Technicians array:', technicians);
-      console.log('Technicians length:', technicians.length);
-      console.log('Selected location ID:', selectedLocationId);
-      console.log('Selected location ID type:', typeof selectedLocationId);
-
-      if (!technicians || technicians.length === 0) {
-        console.log('ERROR: No technicians loaded');
-        return;
-      }
-
-      // Filter technicians by selected location (convert both to numbers for comparison)
-      const selectedLocIdNum = parseInt(selectedLocationId);
-      const locationTechnicians = technicians.filter(t => {
-        const techLocId = parseInt(t.location_id);
-        const isMatch = techLocId === selectedLocIdNum && t.is_active;
-        console.log(`Tech ${t.name}: location_id=${techLocId}, selected=${selectedLocIdNum}, match=${isMatch}, active=${t.is_active}`);
-        return isMatch;
-      });
       
-      console.log('Filtered technicians:', locationTechnicians);
-
-      if (locationTechnicians.length === 0) {
-        console.log('WARNING: No technicians match this location');
-        // Show all active technicians as fallback
-        const allActive = technicians.filter(t => t.is_active);
-        console.log('Showing all active technicians instead:', allActive);
-        allActive.forEach(tech => {
-          const option = document.createElement('option');
-          option.value = tech.id;
-          option.textContent = `${tech.name} (${tech.color_hex}) - Office Location: ${tech.location_name}`;
-          option.style.color = tech.color_hex;
-          select.appendChild(option);
+      // Populate office worker location filter dropdown
+      const officeWorkerFilterSelect = document.getElementById('officeWorkerLocationFilter');
+      if (officeWorkerFilterSelect) {
+        officeWorkerFilterSelect.innerHTML = '<option value="">All Locations</option>';
+        locations.forEach(loc => {
+          officeWorkerFilterSelect.innerHTML += `<option value="${loc.id}">${loc.name}</option>`;
         });
-      } else {
-        locationTechnicians.forEach(tech => {
-          const option = document.createElement('option');
-          option.value = tech.id;
-          option.textContent = `${tech.name} (${tech.color_hex})`;
-          option.style.color = tech.color_hex;
-          select.appendChild(option);
-          console.log('Added option:', tech.name);
-        });
+        // Set default to user's location if they're not admin
+        if (currentUserLocationId) {
+          officeWorkerFilterSelect.value = currentUserLocationId;
+        }
       }
     }
 
@@ -1888,6 +1878,24 @@
       return [32.9346, -97.2251]; // Default to Keller
     }
 
+    function populateTechnicianSelect() {
+      const select = document.getElementById("drawingTechnician");
+      if (!select) return;
+      
+      select.innerHTML = '<option value="">Select technician...</option>';
+      
+      // Filter technicians by current user's location if set
+      const displayTechnicians = currentUserLocationId 
+        ? technicians.filter(t => t.location_id === currentUserLocationId)
+        : technicians;
+      
+      displayTechnicians.forEach(tech => {
+        if (tech.is_active) {
+          select.innerHTML += `<option value="${tech.id}">${tech.name} (${tech.location_name})</option>`;
+        }
+      });
+    }
+
     // ============ TERRITORY DRAWING MODAL ============
     let territoryMap = null;
     let drawingLayer = null;
@@ -2018,8 +2026,9 @@
 
     async function loadDueCustomersOnDrawingMap() {
       try {
-        // Get customers who are due for service
-        const response = await fetch(`${API_BASE}/customers`);
+        // Get customers who are due for service - filter by location if needed
+        const url = currentUserLocationId ? `${API_BASE}/customers?location_id=${currentUserLocationId}` : `${API_BASE}/customers`;
+        const response = await fetch(url);
         const data = await response.json();
         
         if (data.customers && data.customers.length > 0) {
@@ -2055,7 +2064,7 @@
             }
           });
           
-          console.log(`Added ${pinsAdded} red pins to map`);
+          console.log(`Added ${pinsAdded} red pins to map for location ${currentUserLocationId || 'all'}`);
         } else {
           console.log('No customers data available');
         }
@@ -2077,43 +2086,73 @@
     }
 
     function initializeTerritoryMap() {
-      // Get location coordinates
-      const location = locations.find(l => l.id == selectedLocationId);
-      if (!location) return;
+      // Get location coordinates - use user's location if available
+      let centerCoords = [32.9346, -97.2251]; // Default to Keller
+      let locationName = 'Keller';
+      
+      if (currentUserLocationId && currentUserLocation) {
+        // Use logged-in user's location
+        if (currentUserLocation.lat && currentUserLocation.lng) {
+          centerCoords = [currentUserLocation.lat, currentUserLocation.lng];
+          locationName = currentUserLocation.name || 'Your Location';
+        } else {
+          // Fallback to geocoding the address
+          const location = locations.find(l => l.id == currentUserLocationId);
+          if (location && location.address) {
+            const geocoded = geocodeAddress(location.address);
+            if (geocoded) {
+              centerCoords = geocoded;
+              locationName = location.name;
+            }
+          }
+        }
+      } else if (selectedLocationId) {
+        // Use selected location from dropdown
+        const location = locations.find(l => l.id == selectedLocationId);
+        if (location) {
+          if (location.lat && location.lng) {
+            centerCoords = [location.lat, location.lng];
+            locationName = location.name;
+          } else {
+            const geocoded = geocodeAddress(location.address || '');
+            if (geocoded) {
+              centerCoords = geocoded;
+              locationName = location.name;
+            }
+          }
+        }
+      }
+
+      console.log(`Initializing map centered at ${locationName}: ${centerCoords}`);
 
       // Initialize Leaflet map
-      territoryMap = L.map('territoryMap').setView([32.9346, -97.2251], 12); // Keller coordinates
+      territoryMap = L.map('territoryMap').setView(centerCoords, 12);
 
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
         attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
       }).addTo(territoryMap);
 
-      // Add location marker (non-interactive, no popup)
-      const locationCoords = geocodeAddress(location.address || '');
-      if (locationCoords) {
-        L.marker(locationCoords, {
-          interactive: false,  // Non-clickable, doesn't interfere with cursor
-          icon: L.divIcon({
-            className: 'home-location',
-            html: `<div style="
-              background: #dc2626;
-              color: white;
-              border-radius: 50%;
-              width: 30px;
-              height: 30px;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              font-weight: bold;
-              font-size: 12px;
-              border: 3px solid white;
-              box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-            ">🏠</div>`,
-            iconSize: [30, 30],
-            iconAnchor: [15, 15]
-          })
-        }).addTo(territoryMap);
+      // Add home/office icon at map center location
+      const homeIcon = L.divIcon({
+        html: '<div style="background: #3b82f6; color: white; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; font-size: 16px; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3);"><i class="fas fa-home"></i></div>',
+        iconSize: [30, 30],
+        iconAnchor: [15, 15],
+        className: 'home-icon'
+      });
+      
+      // Determine which location to show as home
+      let homeLocation = null;
+      if (currentUserLocationId && currentUserLocation) {
+        homeLocation = currentUserLocation;
+      } else if (selectedLocationId) {
+        homeLocation = locations.find(l => l.id == selectedLocationId);
+      }
+      
+      if (homeLocation && homeLocation.lat && homeLocation.lng) {
+        L.marker([homeLocation.lat, homeLocation.lng], {icon: homeIcon})
+          .addTo(territoryMap)
+          .bindPopup(`<strong>${homeLocation.name}</strong><br>${homeLocation.address || 'No address'}`);
       }
 
       // Add drawing layer for new territory
@@ -2372,20 +2411,29 @@
         const res = await fetch(`${API_BASE}/office-workers`);
         const data = await res.json();
         officeWorkers = data.office_workers || [];
-        renderOfficeWorkersList();
+        
+        // Apply location filtering for non-admin users
+        if (currentUserLocationId) {
+          const filteredWorkers = officeWorkers.filter(w => w.location_id === currentUserLocationId);
+          renderOfficeWorkersList(filteredWorkers);
+        } else {
+          renderOfficeWorkersList(); // Admin sees all
+        }
       } catch (e) {
         console.error("Load office workers error:", e);
       }
     }
 
-    function renderOfficeWorkersList() {
+    function renderOfficeWorkersList(workerList = officeWorkers) {
       const container = document.getElementById("officeWorkersList");
-      if (!officeWorkers || officeWorkers.length === 0) {
+      const displayList = workerList || officeWorkers;
+      
+      if (!displayList || displayList.length === 0) {
         container.innerHTML = '<p style="color: #9ca3af;">No office workers added yet. Add one above to get started.</p>';
         return;
       }
 
-      container.innerHTML = officeWorkers.map(worker => `
+      container.innerHTML = displayList.map(worker => `
         <div class="location-card">
           <div class="location-info">
             <div class="location-name">${worker.name}</div>
@@ -2566,6 +2614,70 @@
     document.getElementById("drawTerritoriesBtn").addEventListener("click", openTerritoryModal);
     document.getElementById("startDrawingBtn").addEventListener("click", startDrawing);
 
+    // Technician location filter dropdown
+    document.getElementById("technicianLocationFilter").addEventListener("change", function() {
+      const selectedLocationId = this.value;
+      filterTechniciansByLocation(selectedLocationId);
+    });
+
+    // Office worker location filter dropdown
+    document.getElementById("officeWorkerLocationFilter").addEventListener("change", function() {
+      const selectedLocationId = this.value;
+      filterOfficeWorkersByLocation(selectedLocationId);
+    });
+
+    // ============ LOCATION FILTERING ============
+    function filterTechniciansByLocation(locationId) {
+      console.log(`Filtering technicians by location_id: ${locationId}`);
+      
+      let filteredTechnicians;
+      if (!locationId || locationId === "") {
+        // Show all technicians
+        filteredTechnicians = technicians;
+      } else {
+        // Show only technicians from selected location
+        filteredTechnicians = technicians.filter(t => t.location_id == locationId);
+      }
+      
+      renderTechniciansList(filteredTechnicians);
+    }
+
+    function filterOfficeWorkersByLocation(locationId) {
+      console.log(`Filtering office workers by location_id: ${locationId}`);
+      
+      let filteredWorkers;
+      if (!locationId || locationId === "") {
+        // Show all office workers
+        filteredWorkers = officeWorkers;
+      } else {
+        // Show only office workers from selected location
+        filteredWorkers = officeWorkers.filter(w => w.location_id == locationId);
+      }
+      
+      renderOfficeWorkersList(filteredWorkers);
+    }
+
+    function filterDataByLocation() {
+      if (!currentUserLocationId) return;
+      
+      console.log(`Filtering data for location_id: ${currentUserLocationId}`);
+      
+      // Filter technicians to show only those from user's location
+      const filteredTechnicians = technicians.filter(t => t.location_id === currentUserLocationId);
+      renderTechniciansList(filteredTechnicians);
+      
+      // Filter office workers to show only those from user's location (if not admin)
+      const filteredWorkers = officeWorkers.filter(w => w.location_id === currentUserLocationId);
+      renderOfficeWorkersList(filteredWorkers);
+      
+      // Update location dropdowns to default to user's location
+      const territorySelect = document.getElementById('territoryLocation');
+      if (territorySelect) {
+        territorySelect.value = currentUserLocationId;
+        selectedLocationId = currentUserLocationId;
+      }
+    }
+
     // ============ CURRENT USER DISPLAY ============
     async function loadCurrentUser() {
       try {
@@ -2573,23 +2685,30 @@
         const data = await res.json();
         
         if (data.authenticated) {
-          const userNameEl = document.getElementById("userName");
-          const userLocationEl = document.getElementById("userLocation");
+          const userNameEl = document.getElementById('userName');
+          const userLocationEl = document.getElementById('userLocation');
           
           if (data.user_type === 'admin') {
             userNameEl.textContent = 'Admin';
             userLocationEl.textContent = data.username || '';
           } else if (data.user_type === 'office_worker') {
             userNameEl.textContent = data.worker_name || data.username;
+            // Store location info for map filtering
+            currentUserLocationId = data.location_id;
+            currentUserLocation = data.location;
+            
             // Fetch location name
             const locRes = await fetch(`${API_BASE}/locations`);
             const locData = await locRes.json();
             const location = locData.locations?.find(l => l.id === data.location_id);
             userLocationEl.textContent = location?.name || '';
+            
+            // Filter data by location after loading
+            filterDataByLocation();
           }
         }
       } catch (e) {
-        console.error("Load current user error:", e);
+        console.error('Load current user error:', e);
       }
     }
 
