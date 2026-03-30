@@ -604,6 +604,7 @@
         <script>
             let editingElements = new Set();
             let customerData = [];
+            let grassTypes = []; // Store grass types for the user's location
 
             const list = document.getElementById("customerList");
             const searchInput = document.getElementById("search");
@@ -618,6 +619,9 @@
                     if (!res.ok) throw new Error("API error: " + res.status);
                     const data = await res.json();
                     customerData = data.customers;
+                    
+                    // Also load grass types for the user's location
+                    await loadGrassTypes();
 
                     if (editingElements.size === 0) {
                         renderCustomers();
@@ -628,6 +632,39 @@
                     if (editingElements.size === 0) {
                         list.innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><h3>Error loading customers</h3></div>';
                     }
+                }
+            }
+            
+            async function loadGrassTypes() {
+                try {
+                    // Get user's location from /me endpoint
+                    const meRes = await fetch('/me');
+                    const meData = await meRes.json();
+                    let locationId = meData.location_id;
+                    
+                    // If no location_id, fetch all locations and use first one
+                    if (!locationId) {
+                        const locRes = await fetch('/locations');
+                        const locData = await locRes.json();
+                        if (locData.locations && locData.locations.length > 0) {
+                            locationId = locData.locations[0].id;
+                        }
+                    }
+                    
+                    // Fetch grass types for this location (or all if no location)
+                    let url = '/treatment-plans';
+                    if (locationId) {
+                        url += `?location_id=${locationId}`;
+                    }
+                    
+                    const res = await fetch(url);
+                    if (!res.ok) throw new Error("API error: " + res.status);
+                    const data = await res.json();
+                    grassTypes = data.grassTypes || [];
+                    console.log('Loaded grass types:', grassTypes);
+                } catch (e) {
+                    console.error("Error loading grass types:", e);
+                    grassTypes = [];
                 }
             }
 
@@ -664,6 +701,9 @@
                 const dueCustomers = pageCustomers.filter(c => c[8] === 'due');
                 const notDueCustomers = pageCustomers.filter(c => c[8] !== 'due');
                 list.innerHTML = "";
+                
+                // Debug: log grass types
+                console.log('Rendering with grass types:', grassTypes);
 
                 if (!customerData || customerData.length === 0) {
                     list.innerHTML = `
@@ -679,6 +719,9 @@
                 pageCustomers.forEach((c, index) => {
                     const rowid = c[9];
                     const isEditing = editingElements.has(rowid);
+                    
+                    // Debug: log customer grass type data
+                    console.log('Customer', c[0], 'grass_type_id:', c[15], 'grass_type_name:', c[16]);
 
                     list.innerHTML += `
     <div class="customer-item">
@@ -715,11 +758,12 @@
                                 try {
                                     const d = new Date(raw);
                                     if (isNaN(d.getTime())) throw new Error();
-                                    const dueAgain = new Date(d.getTime() + 45 * 86400000);
+                                    // Use backend-calculated next due date if available, fallback to 45 days
+                                    const nextDueDate = c[18] ? new Date(c[18]) : new Date(d.getTime() + (c[17] || 45) * 86400000);
                                     return `
                             <div style="padding:0.5rem;background:var(--primary);border-radius:8px;margin-top:0.5rem;font-size:0.8rem;color:var(--white);">
                                 <strong><i class="fas fa-check-circle"></i> Completed: ${d.toLocaleDateString()}</strong><br>
-                                <small>Due again: ${dueAgain.toLocaleDateString()}</small>
+                                <small>Due again: ${nextDueDate.toLocaleDateString()}</small>
                             </div>
                             `;
                                 } catch (e) {
@@ -751,6 +795,26 @@
                     <i class="fas fa-save"></i> Save Notes
                 </button>` : ""}
             </div>
+        </div>
+        <div class="grass-type-section" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #e2e8f0;">
+            <strong><i class="fas fa-leaf"></i> Grass Type</strong>
+            <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem;">
+                ${(() => {
+                    console.log('Rendering grass types for', c[0], 'grassTypes:', grassTypes, 'customer grass_type_id:', c[15]);
+                    if (grassTypes.length === 0) return '<span style="color: #9ca3af; font-size: 0.85rem;">No grass types available for this location</span>';
+                    return grassTypes.map(gt => {
+                        const isChecked = c[15] === gt.id;
+                        console.log('  Checkbox for', gt.name, 'id:', gt.id, 'checked:', isChecked);
+                        return `
+                            <label style="display: flex; align-items: center; gap: 0.25rem; padding: 0.25rem 0.5rem; background: ${isChecked ? '#dcfce7' : '#f3f4f6'}; border-radius: 6px; border: 1px solid ${isChecked ? '#16a34a' : '#e5e7eb'}; cursor: pointer; font-size: 0.85rem;">
+                                <input type="checkbox" ${isChecked ? 'checked' : ''} onchange="updateGrassType(${rowid}, ${gt.id}, this.checked)" style="cursor: pointer;">
+                                <span>${gt.name}</span>
+                            </label>
+                        `;
+                    }).join('');
+                })()}
+            </div>
+            ${c[16] ? `<div style="margin-top: 0.5rem; font-size: 0.85rem; color: #16a34a;"><i class="fas fa-check"></i> Currently assigned: ${c[16]}</div>` : ''}
         </div>
     </div>
 `;
@@ -836,6 +900,31 @@
                         console.error("Save error:", e);
                         alert("Save failed. Try again.");
                     });
+            }
+
+            async function updateGrassType(rowid, grassTypeId, isChecked) {
+                try {
+                    const formData = new URLSearchParams({
+                        rowid: rowid.toString(),
+                        grass_type_id: isChecked ? grassTypeId.toString() : ''
+                    });
+                    
+                    const res = await fetch("/update_grass_type", {
+                        method: "POST",
+                        body: formData
+                    });
+                    
+                    const data = await res.json();
+                    if (data.status === "success") {
+                        // Refresh to show updated assignment
+                        await fetchCustomers();
+                    } else {
+                        alert("Failed to update grass type: " + (data.message || "Unknown error"));
+                    }
+                } catch (e) {
+                    console.error("Update grass type error:", e);
+                    alert("Failed to update grass type");
+                }
             }
 
             document.getElementById("customerForm").addEventListener("submit", async (e) => {

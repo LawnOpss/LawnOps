@@ -1,8 +1,9 @@
 import os
 import sqlite3
-from fastapi import FastAPI, Form, Request, Depends
+from fastapi import FastAPI, Form, Request, Depends, HTTPException
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 from datetime import datetime, timedelta
 import requests
@@ -303,8 +304,63 @@ def optimize_route_greedy(customers: List[Dict]) -> List[Dict]:
     
     return optimized
 
+def get_rounds_count_for_location(location_id: int) -> int:
+    """Count the number of treatment rounds for a location from treatment_plans"""
+    try:
+        # Get the first treatment plan for this location and count its treatments
+        cursor.execute(
+            "SELECT id FROM treatment_plans WHERE location_id = ? LIMIT 1",
+            (location_id,)
+        )
+        plan = cursor.fetchone()
+        
+        if not plan:
+            return 0  # No treatment plans exist for this location
+        
+        plan_id = plan[0]
+        
+        # Count treatments for this plan
+        cursor.execute(
+            "SELECT COUNT(*) FROM treatments WHERE plan_id = ?",
+            (plan_id,)
+        )
+        count = cursor.fetchone()[0]
+        
+        return count
+    except Exception as e:
+        print(f"Error counting rounds for location {location_id}: {e}")
+        return 0
+
+
+def is_point_in_polygon(lat: float, lng: float, polygon: list) -> bool:
+    """Check if a point is inside a polygon using ray casting algorithm"""
+    if not polygon or len(polygon) < 3:
+        return True  # No territory restriction
+    
+    # Ray casting algorithm
+    n = len(polygon)
+    inside = False
+    
+    # Convert to float for comparison
+    x = float(lat)
+    y = float(lng)
+    
+    p1x, p1y = polygon[0]
+    for i in range(n + 1):
+        p2x, p2y = polygon[i % n]
+        if y > min(p1y, p2y):
+            if y <= max(p1y, p2y):
+                if x <= max(p1x, p2x):
+                    if p1y != p2y:
+                        xinters = (y - p1y) * (p2x - p1x) / (p2y - p1y) + p1x
+                    if p1x == p2x or x <= xinters:
+                        inside = not inside
+        p1x, p1y = p2x, p2y
+    
+    return inside
+
+
 def predict_service_schedule(days_ahead: int = 30) -> Dict:
-    """Predict optimal service schedule for next N days"""
     try:
         today = datetime.now().date()
         
@@ -597,6 +653,13 @@ try:
 except sqlite3.OperationalError:
     pass
 
+# ADD grass_type_id column to customers table for grass type assignment
+try:
+    cursor.execute("ALTER TABLE customers ADD COLUMN grass_type_id INTEGER DEFAULT NULL")
+    conn.commit()
+except sqlite3.OperationalError:
+    pass
+
 # ADD location_id column to technicians table for multi-location support
 try:
     cursor.execute("ALTER TABLE technicians ADD COLUMN location_id INTEGER DEFAULT NULL")
@@ -604,7 +667,24 @@ try:
 except sqlite3.OperationalError:
     pass
 
+# ADD location_id column to treatment_plans table for multi-location support
+try:
+    cursor.execute("ALTER TABLE treatment_plans ADD COLUMN location_id INTEGER DEFAULT NULL")
+    conn.commit()
+except sqlite3.OperationalError:
+    pass
+
+# ADD treatments_per_year column to locations table for location-specific service frequency
+try:
+    cursor.execute("ALTER TABLE locations ADD COLUMN treatments_per_year INTEGER DEFAULT 7")
+    conn.commit()
+except sqlite3.OperationalError:
+    pass
+
 app = FastAPI()
+
+# Mount static files directory
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 # Session middleware for login (browser session only - closes when tab closes)
 app.add_middleware(SessionMiddleware, secret_key='lawncare-super-secret-2026-trinity', max_age=None)
@@ -631,7 +711,7 @@ async def login_page(request: Request, error: str = None):
     if request.session.get('logged_in'):
         return RedirectResponse(url="/")
     
-    error_msg = f'<div class="error-message"><i class="fas fa-radiation"></i> {error}</div>' if error else ''
+    error_msg = f'<div class="error-message">>> {error}</div>' if error else ''
     return f"""
     <!DOCTYPE html>
     <html lang="en">
@@ -639,8 +719,7 @@ async def login_page(request: Request, error: str = None):
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>LawnOps | Chemical Warfare Division</title>
-        <link href="https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Oswald:wght@400;600;700&family=Roboto+Condensed:wght@400;700&display=swap" rel="stylesheet">
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+        <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Black+Ops+One&display=swap" rel="stylesheet">
         <style>
             * {{
                 margin: 0;
@@ -649,353 +728,275 @@ async def login_page(request: Request, error: str = None):
             }}
             
             body {{
-                font-family: 'Roboto Condensed', sans-serif;
+                font-family: 'Share Tech Mono', monospace;
                 min-height: 100vh;
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                background: linear-gradient(135deg, #1a2f1a 0%, #2d3a2d 50%, #1a2f1a 100%);
-                position: relative;
+                background: #000;
                 overflow: hidden;
             }}
             
-            /* Tactical grid overlay */
-            body::before {{
-                content: '';
-                position: absolute;
+            /* Splash Screen with Image */
+            #splash {{
+                position: fixed;
                 top: 0;
                 left: 0;
                 width: 100%;
                 height: 100%;
-                background-image:
-                    linear-gradient(rgba(0,255,0,0.03) 1px, transparent 1px),
-                    linear-gradient(90deg, rgba(0,255,0,0.03) 1px, transparent 1px);
-                background-size: 50px 50px;
-                pointer-events: none;
-            }}
-            
-            /* Crosshair in center */
-            body::after {{
-                content: '+';
-                position: absolute;
-                top: 50%;
-                left: 50%;
-                transform: translate(-50%, -50%);
-                font-size: 400px;
-                color: rgba(0,255,0,0.02);
-                pointer-events: none;
-                font-weight: 100;
-            }}
-            
-            .login-container {{
-                position: relative;
-                z-index: 10;
-                width: 100%;
-                max-width: 480px;
-                padding: 20px;
-            }}
-            
-            .login-box {{
-                background: linear-gradient(145deg, #2d3a2d 0%, #1e2b1e 100%);
-                border: 3px solid #4a5d4a;
-                border-radius: 0;
-                padding: 50px 40px;
-                position: relative;
-                box-shadow: 
-                    0 20px 60px rgba(0,0,0,0.8),
-                    inset 0 1px 0 rgba(0,255,0,0.1);
-            }}
-            
-            /* Corner targeting brackets */
-            .login-box::before,
-            .login-box::after {{
-                content: '';
-                position: absolute;
-                width: 40px;
-                height: 40px;
-                border: 4px solid #7a8d3a;
-            }}
-            
-            .login-box::before {{
-                top: -4px;
-                left: -4px;
-                border-right: none;
-                border-bottom: none;
-            }}
-            
-            .login-box::after {{
-                bottom: -4px;
-                right: -4px;
-                border-left: none;
-                border-top: none;
-            }}
-            
-            /* Bottom left corner */
-            .corner-bl {{
-                position: absolute;
-                bottom: -4px;
-                left: -4px;
-                width: 40px;
-                height: 40px;
-                border: 4px solid #7a8d3a;
-                border-right: none;
-                border-top: none;
-            }}
-            
-            /* Top right corner */
-            .corner-tr {{
-                position: absolute;
-                top: -4px;
-                right: -4px;
-                width: 40px;
-                height: 40px;
-                border: 4px solid #7a8d3a;
-                border-left: none;
-                border-bottom: none;
-            }}
-            
-            .logo-section {{
-                text-align: center;
-                margin-bottom: 40px;
-                position: relative;
-            }}
-            
-            /* Backpack sprayer operator icon */
-            .logo-icon {{
-                width: 100px;
-                height: 100px;
-                background: linear-gradient(145deg, #4a5d3a 0%, #3a4d2a 100%);
-                border: 3px solid #7a8d3a;
+                background: #000;
                 display: flex;
-                align-items: center;
+                flex-direction: column;
                 justify-content: center;
-                margin: 0 auto 20px;
-                position: relative;
+                align-items: center;
+                z-index: 100;
+                transition: opacity 0.5s ease;
             }}
             
-            .logo-icon::before {{
-                content: '';
-                position: absolute;
-                top: -10px;
-                left: -10px;
-                right: -10px;
-                bottom: -10px;
-                border: 2px dashed #7a8d3a;
-                opacity: 0.5;
+            #splash.hidden {{
+                opacity: 0;
+                pointer-events: none;
             }}
             
-            .logo-icon i {{
-                font-size: 50px;
-                color: #c8d46a;
+            .splash-image {{
+                max-width: 112.5%;
+                max-height: 87.5vh;
+                object-fit: contain;
             }}
             
-            /* Chemical hazard stamp */
-            .hazard-stamp {{
-                position: absolute;
-                top: -25px;
-                right: -15px;
-                font-family: 'Black Ops One', cursive;
-                font-size: 11px;
-                color: #ffd700;
-                border: 2px solid #ffd700;
-                padding: 4px 8px;
-                transform: rotate(15deg);
-                text-transform: uppercase;
-                letter-spacing: 1px;
-                opacity: 0.9;
-                background: rgba(0,0,0,0.5);
-            }}
-            
-            .logo-text {{
-                font-family: 'Black Ops One', cursive;
-                font-size: 44px;
-                letter-spacing: 3px;
-                text-transform: uppercase;
-                background: linear-gradient(180deg, #c8d46a 0%, #7a8d3a 50%, #4a5d3a 100%);
-                -webkit-background-clip: text;
-                -webkit-text-fill-color: transparent;
-                background-clip: text;
-                text-shadow: 0 2px 4px rgba(0,0,0,0.5);
-                position: relative;
-                display: inline-block;
-            }}
-            
-            /* Night vision green glow */
-            .logo-text::after {{
-                content: 'LAWNOPS';
-                position: absolute;
-                top: 0;
-                left: 0;
-                background: linear-gradient(180deg, #00ff00 0%, #00aa00 100%);
-                -webkit-background-clip: text;
-                -webkit-text-fill-color: transparent;
-                background-clip: text;
-                z-index: -1;
-                opacity: 0.3;
-                filter: blur(8px);
-            }}
-            
-            .subtitle {{
-                font-family: 'Oswald', sans-serif;
-                font-size: 13px;
-                color: #7a8d3a;
-                text-transform: uppercase;
-                letter-spacing: 5px;
-                margin-top: 10px;
-            }}
-            
-            .divider {{
-                width: 80px;
-                height: 3px;
-                background: linear-gradient(90deg, transparent, #7a8d3a, transparent);
-                margin: 20px auto;
-            }}
-            
-            .input-group {{
-                margin-bottom: 25px;
-                position: relative;
-            }}
-            
-            .input-group label {{
-                display: block;
-                margin-bottom: 8px;
-                color: #7a8d3a;
-                font-size: 11px;
-                font-weight: 700;
-                text-transform: uppercase;
-                letter-spacing: 2px;
-            }}
-            
-            .input-wrapper {{
-                position: relative;
-                border: 2px solid #4a5d4a;
-                background: #1a2f1a;
-            }}
-            
-            .input-wrapper::before {{
-                content: '';
-                position: absolute;
-                top: 0;
-                left: 0;
-                width: 4px;
-                height: 100%;
-                background: #7a8d3a;
-            }}
-            
-            .input-wrapper i {{
-                position: absolute;
-                left: 15px;
-                top: 50%;
-                transform: translateY(-50%);
-                color: #5a6d4a;
-                font-size: 14px;
-            }}
-            
-            input {{
-                width: 100%;
-                padding: 14px 16px 14px 45px;
-                border: none;
+            .enter-btn {{
+                margin-top: 40px;
+                transform: translateY(-96px);
+                padding: 20px 60px;
                 background: transparent;
-                color: #c8d46a;
-                font-size: 14px;
-                font-family: 'Roboto Condensed', sans-serif;
+                border: 3px solid #7a8d3a;
+                color: #7a8d3a;
+                font-family: 'Black Ops One', cursive;
+                font-size: 24px;
+                letter-spacing: 8px;
                 text-transform: uppercase;
-                letter-spacing: 1px;
-            }}
-            
-            input::placeholder {{
-                color: #4a5d4a;
-                text-transform: uppercase;
-            }}
-            
-            input:focus {{
-                outline: none;
-                box-shadow: inset 0 0 10px rgba(0,255,0,0.2);
-            }}
-            
-            input:focus + i {{
-                color: #c8d46a;
-            }}
-            
-            .login-btn {{
-                width: 100%;
-                padding: 16px;
-                background: linear-gradient(145deg, #4a5d3a 0%, #3a4d2a 100%);
-                color: #c8d46a;
-                border: 2px solid #7a8d3a;
-                border-radius: 0;
-                font-size: 13px;
-                font-weight: 700;
-                font-family: 'Oswald', sans-serif;
-                text-transform: uppercase;
-                letter-spacing: 3px;
                 cursor: pointer;
                 transition: all 0.3s ease;
                 position: relative;
                 overflow: hidden;
             }}
             
-            .login-btn::before {{
+            .enter-btn:hover {{
+                background: #7a8d3a;
+                color: #000;
+                box-shadow: 0 0 40px rgba(122,141,58,0.6);
+                letter-spacing: 12px;
+            }}
+            
+            .enter-btn::before {{
                 content: '';
                 position: absolute;
                 top: 0;
                 left: -100%;
                 width: 100%;
                 height: 100%;
-                background: linear-gradient(90deg, transparent, rgba(200,212,106,0.2), transparent);
+                background: linear-gradient(90deg, transparent, rgba(122,141,58,0.4), transparent);
                 transition: left 0.5s;
             }}
             
-            .login-btn:hover {{
-                background: #5a6d4a;
-                border-color: #c8d46a;
-                letter-spacing: 5px;
-                box-shadow: 0 0 20px rgba(122,141,58,0.4);
-            }}
-            
-            .login-btn:hover::before {{
+            .enter-btn:hover::before {{
                 left: 100%;
             }}
             
-            .login-btn i {{
-                margin-left: 10px;
+            /* Command Center Overlay */
+            #command-center {{
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: 
+                    linear-gradient(135deg, rgba(10,20,10,0.98) 0%, rgba(20,30,20,0.98) 100%),
+                    repeating-linear-gradient(
+                        0deg,
+                        transparent,
+                        transparent 2px,
+                        rgba(0,255,0,0.03) 2px,
+                        rgba(0,255,0,0.03) 4px
+                    );
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                z-index: 50;
+                opacity: 0;
+                pointer-events: none;
+                transition: opacity 0.5s ease;
             }}
             
-            .error-message {{
-                background: #3a2f1a;
-                border: 1px solid #8b6914;
-                border-left: 4px solid #ffd700;
-                color: #d4a76a;
-                padding: 12px 16px;
-                margin-bottom: 25px;
-                font-size: 12px;
-                text-transform: uppercase;
-                letter-spacing: 1px;
+            #command-center.active {{
+                opacity: 1;
+                pointer-events: all;
+            }}
+            
+            .terminal-window {{
+                width: 90%;
+                max-width: 600px;
+                background: rgba(10,20,10,0.95);
+                border: 2px solid #4a5d4a;
+                box-shadow: 
+                    0 0 60px rgba(0,255,0,0.2),
+                    inset 0 0 60px rgba(0,255,0,0.05);
+                position: relative;
+            }}
+            
+            .terminal-header {{
+                background: linear-gradient(90deg, #2d3a2d, #1e2b1e);
+                padding: 15px 20px;
+                border-bottom: 2px solid #4a5d4a;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }}
+            
+            .terminal-title {{
+                color: #7a8d3a;
+                font-size: 14px;
+                letter-spacing: 3px;
+            }}
+            
+            .terminal-status {{
                 display: flex;
                 align-items: center;
-                gap: 10px;
+                gap: 8px;
+                color: #00ff00;
+                font-size: 12px;
             }}
             
-            .footer {{
-                text-align: center;
-                margin-top: 30px;
-                color: #5a6d4a;
-                font-size: 10px;
-                text-transform: uppercase;
+            .status-dot {{
+                width: 8px;
+                height: 8px;
+                background: #00ff00;
+                border-radius: 50%;
+                animation: pulse 1.5s infinite;
+                box-shadow: 0 0 10px #00ff00;
+            }}
+            
+            @keyframes pulse {{
+                0%, 100% {{ opacity: 1; }}
+                50% {{ opacity: 0.4; }}
+            }}
+            
+            .terminal-body {{
+                padding: 40px;
+            }}
+            
+            .boot-sequence {{
+                color: #4a5d4a;
+                font-size: 12px;
+                margin-bottom: 30px;
+                line-height: 1.8;
+            }}
+            
+            .boot-line {{
+                opacity: 0;
+                animation: fadeIn 0.1s forwards;
+            }}
+            
+            @keyframes fadeIn {{
+                to {{ opacity: 1; }}
+            }}
+            
+            .login-form {{
+                margin-top: 20px;
+            }}
+            
+            .input-line {{
+                display: flex;
+                align-items: center;
+                margin-bottom: 25px;
+                font-size: 16px;
+            }}
+            
+            .prompt {{
+                color: #7a8d3a;
+                margin-right: 10px;
+                white-space: nowrap;
+            }}
+            
+            input {{
+                background: transparent;
+                border: none;
+                border-bottom: 2px solid #4a5d4a;
+                color: #c8d46a;
+                font-family: 'Share Tech Mono', monospace;
+                font-size: 16px;
+                padding: 5px 10px;
+                flex: 1;
+                outline: none;
                 letter-spacing: 2px;
             }}
             
-            /* Scan line effect - night vision style */
+            input:focus {{
+                border-bottom-color: #7a8d3a;
+                box-shadow: 0 2px 10px rgba(122,141,58,0.3);
+            }}
+            
+            input::placeholder {{
+                color: #3a4d3a;
+            }}
+            
+            .submit-line {{
+                margin-top: 30px;
+            }}
+            
+            .submit-btn {{
+                background: transparent;
+                border: 2px solid #7a8d3a;
+                color: #7a8d3a;
+                font-family: 'Share Tech Mono', monospace;
+                font-size: 14px;
+                padding: 12px 30px;
+                cursor: pointer;
+                letter-spacing: 3px;
+                text-transform: uppercase;
+                transition: all 0.3s ease;
+            }}
+            
+            .submit-btn:hover {{
+                background: #7a8d3a;
+                color: #000;
+                box-shadow: 0 0 20px rgba(122,141,58,0.4);
+            }}
+            
+            .back-btn {{
+                position: absolute;
+                top: -40px;
+                left: 0;
+                background: transparent;
+                border: none;
+                color: #4a5d4a;
+                font-family: 'Share Tech Mono', monospace;
+                font-size: 12px;
+                cursor: pointer;
+                letter-spacing: 2px;
+                transition: color 0.3s;
+            }}
+            
+            .back-btn:hover {{
+                color: #7a8d3a;
+            }}
+            
+            .error-message {{
+                color: #ff4444;
+                font-size: 12px;
+                margin-top: 15px;
+                padding: 10px;
+                border-left: 3px solid #ff4444;
+                background: rgba(255,68,68,0.1);
+            }}
+            
             .scan-line {{
                 position: fixed;
                 top: 0;
                 left: 0;
                 width: 100%;
-                height: 4px;
+                height: 2px;
                 background: rgba(0,255,0,0.3);
-                animation: scan 6s linear infinite;
+                animation: scan 4s linear infinite;
                 pointer-events: none;
-                z-index: 100;
+                z-index: 200;
                 box-shadow: 0 0 10px #00ff00;
             }}
             
@@ -1004,105 +1005,140 @@ async def login_page(request: Request, error: str = None):
                 100% {{ transform: translateY(100vh); }}
             }}
             
-            /* Munitions status indicator */
-            .status-bar {{
+            /* Corner brackets */
+            .corner {{
                 position: absolute;
-                top: -30px;
-                left: 0;
-                right: 0;
-                display: flex;
-                justify-content: space-between;
-                font-size: 10px;
-                color: #7a8d3a;
-                text-transform: uppercase;
-                letter-spacing: 1px;
+                width: 30px;
+                height: 30px;
+                border: 3px solid #7a8d3a;
             }}
             
-            .status-indicator {{
-                display: flex;
-                align-items: center;
-                gap: 5px;
+            .corner-tl {{
+                top: -3px;
+                left: -3px;
+                border-right: none;
+                border-bottom: none;
             }}
             
-            .status-dot {{
-                width: 8px;
-                height: 8px;
-                background: #00ff00;
-                border-radius: 50%;
-                animation: pulse 2s infinite;
-                box-shadow: 0 0 5px #00ff00;
+            .corner-tr {{
+                top: -3px;
+                right: -3px;
+                border-left: none;
+                border-bottom: none;
             }}
             
-            @keyframes pulse {{
-                0%, 100% {{ opacity: 1; }}
-                50% {{ opacity: 0.5; }}
+            .corner-bl {{
+                bottom: -3px;
+                left: -3px;
+                border-right: none;
+                border-top: none;
+            }}
+            
+            .corner-br {{
+                bottom: -3px;
+                right: -3px;
+                border-left: none;
+                border-top: none;
             }}
             
             @media (max-width: 480px) {{
-                .login-box {{
-                    padding: 40px 25px;
+                .splash-image {{
+                    max-width: 95%;
                 }}
-                .logo-text {{
-                    font-size: 36px;
+                .enter-btn {{
+                    padding: 15px 40px;
+                    font-size: 18px;
+                }}
+                .terminal-body {{
+                    padding: 25px;
                 }}
             }}
         </style>
     </head>
     <body>
-        <div class="scan-line"></div>
-        <div class="login-container">
-            <div class="login-box">
-                <div class="corner-bl"></div>
-                <div class="corner-tr"></div>
+        
+        <!-- Splash Screen -->
+        <div id="splash">
+            <img src="/static/lawnops_logo.png" alt="LawnOps" class="splash-image">
+            <button class="enter-btn" onclick="enterCommandCenter()">ENTER</button>
+        </div>
+        
+        <!-- Command Center Login -->
+        <div id="command-center">
+            <div class="terminal-window">
+                <div class="corner corner-tl"></div>
+                <div class="corner corner-tr"></div>
+                <div class="corner corner-bl"></div>
+                <div class="corner corner-br"></div>
                 
-                <div class="status-bar">
-                    <div class="status-indicator">
+                <button class="back-btn" onclick="backToSplash()"><< BACK</button>
+                
+                <div class="terminal-header">
+                    <span class="terminal-title">COMMAND CENTER // LOGIN</span>
+                    <div class="terminal-status">
                         <div class="status-dot"></div>
                         <span>SYSTEM ONLINE</span>
                     </div>
-                    <span>CWD // SECURE</span>
                 </div>
                 
-                <div class="logo-section">
-                    <div class="hazard-stamp">CHEMICAL</div>
-                    <div class="logo-icon">
-                        <i class="fas fa-spray-can"></i>
-                    </div>
-                    <h1 class="logo-text">LawnOps</h1>
-                    <div class="divider"></div>
-                    <p class="subtitle">Chemical Warfare Division</p>
-                </div>
-                
-                {error_msg}
-                
-                <form method="POST" action="/login">
-                    <div class="input-group">
-                        <label for="username">Operative ID</label>
-                        <div class="input-wrapper">
-                            <input type="text" id="username" name="username" placeholder="ENTER OPERATIVE ID" required autofocus autocomplete="username">
-                            <i class="fas fa-fingerprint"></i>
-                        </div>
+                <div class="terminal-body">
+                    <div class="boot-sequence" id="boot-sequence">
+                        Input username and password.<br>
+                        Case sensitive.
                     </div>
                     
-                    <div class="input-group">
-                        <label for="password">Clearance Code</label>
-                        <div class="input-wrapper">
-                            <input type="password" id="password" name="password" placeholder="ENTER CLEARANCE CODE" required autocomplete="current-password">
-                            <i class="fas fa-lock"></i>
-                        </div>
-                    </div>
+                    {error_msg}
                     
-                    <button type="submit" class="login-btn">
-                        Initialize Access <i class="fas fa-chevron-right"></i>
-                    </button>
-                </form>
-                
-                <div class="footer">
-                    <p>Authorized Chemical Personnel Only // CWD-Alpha</p>
-                    <p>Munitions Status: Locked & Loaded</p>
+                    <form method="POST" action="/login" class="login-form">
+                        <div class="input-line">
+                            <span class="prompt">username...</span>
+                            <input type="text" id="username" name="username" required autofocus autocomplete="off">
+                        </div>
+                        
+                        <div class="input-line">
+                            <span class="prompt">password...</span>
+                            <input type="password" id="password" name="password" required autocomplete="off">
+                        </div>
+                        
+                        <div class="submit-line">
+                            <button type="submit" class="submit-btn">AUTHENTICATE >></button>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>
+        
+        <script>
+            function enterCommandCenter() {{
+                document.getElementById('splash').classList.add('hidden');
+                document.getElementById('command-center').classList.add('active');
+                setTimeout(() => {{
+                    document.getElementById('username').focus();
+                }}, 300);
+            }}
+            
+            function backToSplash() {{
+                document.getElementById('command-center').classList.remove('active');
+                document.getElementById('splash').classList.remove('hidden');
+            }}
+            
+            // Allow Enter key to submit from inputs
+            document.addEventListener('DOMContentLoaded', function() {{
+                const inputs = document.querySelectorAll('input');
+                inputs.forEach(input => {{
+                    input.addEventListener('keypress', function(e) {{
+                        if (e.key === 'Enter') {{
+                            e.preventDefault();
+                            if (this.id === 'username') {{
+                                document.getElementById('password').focus();
+                            }} else if (this.id === 'password') {{
+                                this.form.submit();
+                            }}
+                        }}
+                    }});
+                }});
+            }});
+        </script>
     </body>
     </html>
     """
@@ -1110,6 +1146,7 @@ async def login_page(request: Request, error: str = None):
 @app.post("/login")
 async def do_login(request: Request, username: str = Form(...), password: str = Form(...)):
     """Process login form - check hardcoded admin OR office_workers DB"""
+    # ... (rest of the code remains the same)
     import hashlib
     
     # Check hardcoded admin credentials first
@@ -1235,44 +1272,50 @@ def get_customers(request: Request):
         if location_id:
             cursor.execute("""
                 SELECT 
-                    COALESCE(name, ''), 
-                    COALESCE(address, ''), 
-                    COALESCE(phone, ''), 
-                    COALESCE(sqft, 0), 
-                    COALESCE(monthly_min, 0), 
-                    COALESCE(monthly_max, 0),
-                    COALESCE(notes, ''),
-                    last_service_date,
-                    rowid,
-                    lat,
-                    lng,
-                    actual_price,
-                    measurement_data,
-                    location_id
-                FROM customers 
-                WHERE location_id = ? OR location_id IS NULL
-                ORDER BY CASE WHEN last_service_date IS NULL THEN 0 ELSE 1 END, last_service_date ASC
+                    COALESCE(c.name, ''), 
+                    COALESCE(c.address, ''), 
+                    COALESCE(c.phone, ''), 
+                    COALESCE(c.sqft, 0), 
+                    COALESCE(c.monthly_min, 0), 
+                    COALESCE(c.monthly_max, 0),
+                    COALESCE(c.notes, ''),
+                    c.last_service_date,
+                    c.rowid,
+                    c.lat,
+                    c.lng,
+                    c.actual_price,
+                    c.measurement_data,
+                    c.location_id,
+                    c.grass_type_id,
+                    COALESCE(tp.grass_type_name, '')
+                FROM customers c
+                LEFT JOIN treatment_plans tp ON c.grass_type_id = tp.id
+                WHERE c.location_id = ? OR c.location_id IS NULL
+                ORDER BY CASE WHEN c.last_service_date IS NULL THEN 0 ELSE 1 END, c.last_service_date ASC
             """, (location_id,))
         else:
             # Admin sees all customers
             cursor.execute("""
                 SELECT 
-                    COALESCE(name, ''), 
-                    COALESCE(address, ''), 
-                    COALESCE(phone, ''), 
-                    COALESCE(sqft, 0), 
-                    COALESCE(monthly_min, 0), 
-                    COALESCE(monthly_max, 0),
-                    COALESCE(notes, ''),
-                    last_service_date,
-                    rowid,
-                    lat,
-                    lng,
-                    actual_price,
-                    measurement_data,
-                    location_id
-                FROM customers 
-                ORDER BY CASE WHEN last_service_date IS NULL THEN 0 ELSE 1 END, last_service_date ASC
+                    COALESCE(c.name, ''), 
+                    COALESCE(c.address, ''), 
+                    COALESCE(c.phone, ''), 
+                    COALESCE(c.sqft, 0), 
+                    COALESCE(c.monthly_min, 0), 
+                    COALESCE(c.monthly_max, 0),
+                    COALESCE(c.notes, ''),
+                    c.last_service_date,
+                    c.rowid,
+                    c.lat,
+                    c.lng,
+                    c.actual_price,
+                    c.measurement_data,
+                    c.location_id,
+                    c.grass_type_id,
+                    COALESCE(tp.grass_type_name, '')
+                FROM customers c
+                LEFT JOIN treatment_plans tp ON c.grass_type_id = tp.id
+                ORDER BY CASE WHEN c.last_service_date IS NULL THEN 0 ELSE 1 END, c.last_service_date ASC
             """)
         rows = cursor.fetchall()
     except Exception as e:
@@ -1297,7 +1340,9 @@ def get_customers(request: Request):
             lng,
             actual_price,
             measurement_data,
-            location_id
+            location_id,
+            grass_type_id,
+            grass_type_name
         ) = row
 
         if last_service_date:
@@ -1306,8 +1351,17 @@ def get_customers(request: Request):
         else:
             days_since = 9999  # never serviced
 
-        is_due = (last_service_date is None) or (days_since >= 45)
-        status = "due" if is_due else "not_due"
+        # Get location-specific service frequency by counting rounds from treatment_plans
+        rounds_count = get_rounds_count_for_location(location_id)
+        
+        if rounds_count == 0:
+            # No rounds configured - customer shows as not_due with a note
+            is_due = False
+            status = "no_rounds_configured"
+        else:
+            days_between_service = round(365 / rounds_count)
+            is_due = (last_service_date is None) or (days_since >= days_between_service)
+            status = "due" if is_due else "not_due"
 
         customers_with_status.append(
             (
@@ -1325,7 +1379,11 @@ def get_customers(request: Request):
                 lng,
                 actual_price,
                 measurement_data,
-                location_id
+                location_id,
+                grass_type_id,
+                grass_type_name,
+                days_between_service if rounds_count > 0 else 0,  # [17] days between
+                (datetime.fromisoformat(last_service_date).date() + timedelta(days=days_between_service)).isoformat() if last_service_date and rounds_count > 0 else None  # [18] next due date
             )
         )
 
@@ -1377,6 +1435,23 @@ def update_actual_price(rowid: int = Form(...), actual_price: float = Form(...))
     cursor.execute("UPDATE customers SET actual_price = ? WHERE rowid = ?", (actual_price, rowid))
     conn.commit()
     return {"status": "success"}
+
+
+@app.post("/update_grass_type")
+def update_grass_type(rowid: int = Form(...), grass_type_id: str = Form(...)):
+    """Update the grass type for a customer"""
+    try:
+        # Convert empty string to None (NULL in database)
+        grass_type_id_value = int(grass_type_id) if grass_type_id and grass_type_id.strip() else None
+        
+        cursor.execute("UPDATE customers SET grass_type_id = ? WHERE rowid = ?", (grass_type_id_value, rowid))
+        conn.commit()
+        if cursor.rowcount > 0:
+            return {"status": "success", "message": "Grass type updated"}
+        else:
+            return {"status": "error", "message": "Customer not found"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
 
 @app.post("/delete_customer")
@@ -1448,9 +1523,17 @@ def geocode_missing():
 # =============== TREATMENT PLANS ENDPOINTS ===============
 
 @app.get("/treatment-plans")
-def get_treatment_plans():
-    """Fetch all treatment plans with their treatments, chemicals, and notes - ordered by treatment_order"""
-    cursor.execute("SELECT id, grass_type_name FROM treatment_plans ORDER BY grass_type_name")
+def get_treatment_plans(location_id: int = None):
+    """Fetch treatment plans with their treatments, chemicals, and notes - filtered by location"""
+    if location_id:
+        cursor.execute(
+            "SELECT id, grass_type_name FROM treatment_plans WHERE location_id = ? ORDER BY grass_type_name",
+            (location_id,)
+        )
+    else:
+        # If no location specified, return empty (all plans must have a location)
+        cursor.execute("SELECT id, grass_type_name FROM treatment_plans WHERE 1=0")
+    
     plans = cursor.fetchall()
     
     result = []
@@ -1487,6 +1570,36 @@ def get_treatment_plans():
     return {"grassTypes": result}
 
 
+@app.get("/treatment-plans/{plan_id}/treatments")
+def get_treatments_for_plan(plan_id: int):
+    """Fetch treatments for a specific treatment plan"""
+    try:
+        cursor.execute("""
+            SELECT id, treatment_number, treatment_order, chemicals, notes 
+            FROM treatments 
+            WHERE plan_id = ? 
+            ORDER BY treatment_order ASC
+        """, (plan_id,))
+        treatments = cursor.fetchall()
+        
+        treatment_list = []
+        for t_id, t_number, t_order, chems_json, notes_json in treatments:
+            import json
+            chems = json.loads(chems_json) if chems_json else []
+            notes = json.loads(notes_json) if notes_json else []
+            treatment_list.append({
+                "id": t_id,
+                "treatment_number": t_number,
+                "treatment_order": t_order,
+                "chemicals": chems,
+                "notes": notes
+            })
+        
+        return {"status": "success", "treatments": treatment_list}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
 @app.get("/global-data")
 def get_global_data():
     """Fetch condition codes and chemical autos with their IDs"""
@@ -1503,18 +1616,21 @@ def get_global_data():
 
 
 @app.post("/treatment-plans")
-def create_treatment_plan(grass_type_name: str = Form(...)):
-    """Create a new treatment plan (grass type)"""
+def create_treatment_plan(grass_type_name: str = Form(...), location_id: int = Form(...)):
+    """Create a new treatment plan (grass type) - must be associated with a location"""
+    if not location_id:
+        return {"status": "error", "message": "Location is required for treatment plans"}
+    
     try:
         cursor.execute(
-            "INSERT INTO treatment_plans (grass_type_name) VALUES (?)",
-            (grass_type_name,)
+            "INSERT INTO treatment_plans (grass_type_name, location_id) VALUES (?, ?)",
+            (grass_type_name, location_id)
         )
         conn.commit()
         plan_id = cursor.lastrowid
         return {"status": "success", "id": plan_id, "name": grass_type_name}
     except sqlite3.IntegrityError:
-        return {"status": "error", "message": "Grass type already exists"}
+        return {"status": "error", "message": "Grass type already exists for this location"}
 
 
 @app.delete("/treatment-plans/{plan_id}")
@@ -2378,7 +2494,8 @@ def update_location(location_id: int, name: str = Form(...), address: str = Form
     try:
         # Check if address is being updated
         cursor.execute("SELECT address FROM locations WHERE id = ?", (location_id,))
-        current_address = cursor.fetchone()
+        current_data = cursor.fetchone()
+        current_address = current_data[0] if current_data else None
         
         # Geocode the new address to get lat/lng if address changed
         lat = None
@@ -2964,7 +3081,31 @@ def get_daily_routes(request: Request, location_id: int = None, date: str = None
                 })
                 continue
             
-            # Get due customers in this technician's territory (45+ days like the rest of the app)
+            # Get due customers in this technician's territory (using location-specific frequency)
+            # Count rounds from treatment_plans for this location
+            rounds_count = get_rounds_count_for_location(target_location)
+            if rounds_count == 0:
+                # No rounds configured - skip this location
+                print(f"Tech {tech_name}: No rounds configured for location {target_location}, skipping")
+                daily_routes.append({
+                    "technician_id": tech_id,
+                    "technician_name": tech_name,
+                    "technician_color": tech_color,
+                    "customers": [],
+                    "total_sqft": 0,
+                    "total_revenue": 0,
+                    "total_drive_miles": 0,
+                    "total_service_minutes": 0,
+                    "total_drive_minutes": 0,
+                    "total_time_minutes": 0,
+                    "customer_count": 0,
+                    "remaining_due": 0,
+                    "message": "Add treatment rounds to show due customers"
+                })
+                continue
+            
+            days_between = round(365 / rounds_count)
+            
             cursor.execute("""
                 SELECT 
                     c.id, c.name, c.address, c.sqft, c.actual_price, 
@@ -2972,8 +3113,8 @@ def get_daily_routes(request: Request, location_id: int = None, date: str = None
                     julianday('now') - julianday(c.last_service_date) as days_since_service
                 FROM customers c
                 WHERE c.location_id = ? AND c.lat IS NOT NULL AND c.lng IS NOT NULL
-                    AND (c.last_service_date IS NULL OR julianday('now') - julianday(c.last_service_date) > 45)
-            """, (target_location,))
+                    AND (c.last_service_date IS NULL OR julianday('now') - julianday(c.last_service_date) > ?)
+            """, (target_location, days_between))
             
             all_due_customers = cursor.fetchall()
             print(f"Tech {tech_name}: Found {len(all_due_customers)} total due customers at location {target_location}")
@@ -3093,9 +3234,1085 @@ def get_daily_routes(request: Request, location_id: int = None, date: str = None
                 "total_revenue": round(total_revenue, 2)
             }
         }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+# ========== TECHNICIAN MOBILE API ENDPOINTS ==========
+
+@app.post("/api/tech/login")
+def technician_login(tech_name: str = Form(...)):
+    """Mobile app login for technicians using name only (no password for now)"""
+    try:
+        # Find technician by name (case insensitive partial match)
+        cursor.execute("""
+            SELECT t.id, t.name, t.location_id, t.color_hex, 
+                   l.name as location_name, l.address as location_address
+            FROM technicians t
+            JOIN locations l ON t.location_id = l.id
+            WHERE LOWER(t.name) LIKE LOWER(?) AND t.is_active = 1
+            LIMIT 1
+        """, (f"%{tech_name}%",))
         
+        row = cursor.fetchone()
+        
+        if not row:
+            return {"status": "error", "message": "Technician not found"}
+        
+        import hashlib
+        import secrets
+        token = hashlib.sha256(f"{row[0]}:{secrets.token_hex(16)}".encode()).hexdigest()
+        
+        return {
+            "status": "success",
+            "token": token,
+            "tech_id": row[0],
+            "tech_name": row[1],
+            "location_id": row[2],
+            "color": row[3],
+            "location_name": row[4],
+            "location_address": row[5]
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@app.get("/api/tech/my-route")
+def get_technician_route(tech_id: int = None, location_id: int = None):
+    """Get assigned route for the technician - filtered by territory like routing.html"""
+    try:
+        if not location_id:
+            location_id = 1
+        
+        # Get technician info
+        tech_name = "Technician"
+        if tech_id:
+            cursor.execute("SELECT name FROM technicians WHERE id = ?", (tech_id,))
+            row = cursor.fetchone()
+            if row:
+                tech_name = row[0]
+        
+        # Get office location
+        cursor.execute("SELECT lat, lng, address FROM locations WHERE id = ?", (location_id,))
+        loc_data = cursor.fetchone()
+        office_lat, office_lng = loc_data[0], loc_data[1] if loc_data else (32.9346, -97.2251)
+        
+        # Get due customers using location-specific frequency
+        rounds_count = get_rounds_count_for_location(location_id)
+        if rounds_count == 0:
+            return {
+                "status": "success",
+                "technician_id": tech_id or 1,
+                "technician_name": tech_name,
+                "office_location": {"lat": office_lat, "lng": office_lng},
+                "customer_count": 0,
+                "customers": [],
+                "message": "Add treatment rounds to show due customers"
+            }
+        
+        days_between = round(365 / rounds_count)
+        
+        # Get technician's territory polygon if available
+        tech_territory = None
+        if tech_id:
+            cursor.execute(
+                "SELECT polygon_coords FROM technician_territories WHERE technician_id = ?",
+                (tech_id,)
+            )
+            row = cursor.fetchone()
+            if row and row[0]:
+                try:
+                    tech_territory = json.loads(row[0])
+                except:
+                    tech_territory = None
+        
+        # Get all due customers for this location
+        cursor.execute("""
+            SELECT 
+                c.id, c.name, c.address, c.sqft, c.actual_price, c.monthly_min, c.monthly_max,
+                c.lat, c.lng, c.last_service_date, c.notes, c.phone,
+                c.grass_type_id,
+                COALESCE(tp.grass_type_name, ''),
+                julianday('now') - julianday(c.last_service_date) as days_since_service
+            FROM customers c
+            LEFT JOIN treatment_plans tp ON c.grass_type_id = tp.id
+            WHERE c.location_id = ? AND c.lat IS NOT NULL AND c.lng IS NOT NULL
+                AND (c.last_service_date IS NULL OR julianday('now') - julianday(c.last_service_date) > ?)
+        """, (location_id, days_between))
+        
+        customers = []
+        for row in cursor.fetchall():
+            lat, lng = row[7], row[8]
+            
+            # Filter by territory if tech has one assigned
+            if tech_territory:
+                if not is_point_in_polygon(lat, lng, tech_territory):
+                    continue
+            
+            customers.append({
+                "id": row[0],
+                "name": row[1],
+                "address": row[2],
+                "sqft": row[3] or 0,
+                "actual_price": row[4] or 0,
+                "monthly_min": row[5] or 0,
+                "monthly_max": row[6] or 0,
+                "lat": lat,
+                "lng": lng,
+                "last_service_date": row[9],
+                "notes": row[10] or "",
+                "phone": row[11] or "",
+                "grass_type_id": row[12],
+                "grass_type_name": row[13] or "",
+                "days_since_service": row[14] or 999
+            })
+        
+        # Sort by days since service (most overdue first)
+        customers.sort(key=lambda x: x["days_since_service"], reverse=True)
+        
+        # Apply capacity constraints and optimize route
+        MAX_SQFT = 200000
+        MAX_REVENUE = 1500.0
+        
+        if customers:
+            optimized = []
+            current_lat, current_lng = office_lat, office_lng
+            remaining = customers.copy()
+            total_sqft = 0
+            total_revenue = 0
+            
+            while remaining:
+                nearest_idx = None
+                nearest_dist = float('inf')
+                
+                for i, customer in enumerate(remaining):
+                    dist = haversine_distance(current_lat, current_lng, 
+                                            customer["lat"], customer["lng"])
+                    if dist < nearest_dist:
+                        nearest_dist = dist
+                        nearest_idx = i
+                
+                if nearest_idx is None:
+                    break
+                
+                customer = remaining[nearest_idx]
+                
+                # Check capacity constraints
+                new_sqft = total_sqft + customer["sqft"]
+                new_revenue = total_revenue + customer["actual_price"]
+                
+                if new_sqft > MAX_SQFT or new_revenue > MAX_REVENUE:
+                    break
+                
+                remaining.pop(nearest_idx)
+                customer["drive_miles"] = round(nearest_dist, 2)
+                optimized.append(customer)
+                
+                total_sqft = new_sqft
+                total_revenue = new_revenue
+                current_lat = customer["lat"]
+                current_lng = customer["lng"]
+            
+            customers = optimized
+        
+        return {
+            "status": "success",
+            "technician_id": tech_id or 1,
+            "technician_name": tech_name,
+            "office_location": {"lat": office_lat, "lng": office_lng},
+            "customer_count": len(customers),
+            "customers": customers
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@app.get("/api/tech/customer/{customer_id}")
+def get_customer_for_tech(customer_id: int):
+    """Get full customer details with service history"""
+    try:
+        cursor.execute("""
+            SELECT c.id, c.name, c.address, c.phone, c.sqft, c.actual_price, 
+                   c.monthly_min, c.monthly_max, c.notes, c.lat, c.lng, c.last_service_date,
+                   c.grass_type_id,
+                   COALESCE(tp.grass_type_name, ''),
+                   l.name as location_name
+            FROM customers c
+            LEFT JOIN treatment_plans tp ON c.grass_type_id = tp.id
+            JOIN locations l ON c.location_id = l.id
+            WHERE c.id = ?
+        """, (customer_id,))
+        
+        row = cursor.fetchone()
+        if not row:
+            return {"status": "error", "message": "Customer not found"}
+        
+        customer = {
+            "id": row[0],
+            "name": row[1],
+            "address": row[2],
+            "phone": row[3] or "",
+            "sqft": row[4] or 0,
+            "actual_price": row[5] or 0,
+            "monthly_min": row[6] or 0,
+            "monthly_max": row[7] or 0,
+            "notes": row[8] or "",
+            "lat": row[9],
+            "lng": row[10],
+            "last_service_date": row[11],
+            "grass_type_id": row[12],
+            "grass_type_name": row[13] or "",
+            "location_name": row[14]
+        }
+        
+        # Get service history
+        cursor.execute("""
+            SELECT sv.service_date, sv.condition_before, sv.condition_after, 
+                   sv.chemicals_used, sv.notes, sv.duration_minutes, sv.technician_name
+            FROM service_visits sv
+            WHERE sv.customer_id = ?
+            ORDER BY sv.service_date DESC
+            LIMIT 5
+        """, (customer_id,))
+        
+        history = []
+        for sv in cursor.fetchall():
+            try:
+                chemicals = json.loads(sv[3]) if sv[3] else []
+            except:
+                chemicals = []
+            
+            history.append({
+                "date": sv[0],
+                "condition_before": sv[1],
+                "condition_after": sv[2],
+                "chemicals": chemicals,
+                "notes": sv[4] or "",
+                "duration_minutes": sv[5] or 0,
+                "technician": sv[6] or "Unknown"
+            })
+        
+        customer["service_history"] = history
+        
+        return {"status": "success", "customer": customer}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@app.post("/api/tech/complete-job")
+def complete_job_from_mobile(
+    customer_id: int = Form(...),
+    condition_before: str = Form(...),
+    condition_after: str = Form(...),
+    chemicals_used: str = Form("[]"),
+    notes: str = Form(""),
+    duration_minutes: int = Form(...),
+    labor_hours: float = Form(0),
+    gps_lat: float = Form(None),
+    gps_lng: float = Form(None)
+):
+    """Record a completed service from technician mobile app"""
+    try:
+        cursor.execute("SELECT location_id FROM customers WHERE id = ?", (customer_id,))
+        cust_row = cursor.fetchone()
+        location_id = cust_row[0] if cust_row else 1
+        
+        cursor.execute("""
+            INSERT INTO service_visits 
+            (location_id, customer_id, condition_before, condition_after, chemicals_used, notes, 
+             duration_minutes, labor_hours, gps_lat, gps_lng, technician_name, treatment_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (location_id, customer_id, condition_before, condition_after, 
+              chemicals_used, notes, duration_minutes, labor_hours, 
+              gps_lat, gps_lng, "Mobile Tech", None))
+        
+        cursor.execute("UPDATE customers SET last_service_date = datetime('now') WHERE id = ?", 
+                     (customer_id,))
+        
+        conn.commit()
+        
+        return {
+            "status": "success",
+            "message": "Service recorded successfully",
+            "visit_id": cursor.lastrowid
+        }
     except Exception as e:
         import traceback
-        print(f"Daily routes error: {e}")
         traceback.print_exc()
         return {"status": "error", "message": str(e)}
+
+# ========== TECHNICIAN TEST PAGE ==========
+
+@app.get("/tech-test", response_class=HTMLResponse)
+async def tech_test_page():
+    """Mobile app test interface"""
+    return """
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+        <title>Tech App Test | LawnOps</title>
+        <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                background: #16a34a;
+                min-height: 100vh;
+            }
+            .screen {
+                display: none;
+                min-height: 100vh;
+                width: 100%;
+            }
+            .screen.active { display: block; }
+            .screen.login-screen.active { display: flex; }
+            
+            /* Login Screen */
+            .login-screen {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                padding: 30px;
+            }
+            .login-card {
+                background: white;
+                border-radius: 20px;
+                padding: 40px 30px;
+                width: 100%;
+                max-width: 360px;
+            }
+            .logo { text-align: center; margin-bottom: 30px; }
+            .logo-emoji { font-size: 60px; margin-bottom: 10px; }
+            .logo h1 { font-size: 28px; color: #166534; margin-bottom: 5px; }
+            .logo p { color: #6b7280; font-size: 14px; }
+            .form-group { margin-bottom: 20px; }
+            .form-label { display: block; font-size: 14px; font-weight: 600; color: #374151; margin-bottom: 8px; }
+            .form-input {
+                width: 100%;
+                padding: 16px;
+                border: 2px solid #e5e7eb;
+                border-radius: 12px;
+                font-size: 16px;
+            }
+            .pin-input { font-size: 24px; letter-spacing: 8px; text-align: center; }
+            .btn {
+                width: 100%;
+                padding: 18px;
+                background: #16a34a;
+                color: white;
+                border: none;
+                border-radius: 12px;
+                font-size: 16px;
+                font-weight: 600;
+                cursor: pointer;
+            }
+            .error { background: #fef2f2; color: #dc2626; padding: 12px; border-radius: 8px; margin-bottom: 20px; display: none; }
+            .error.show { display: block; }
+            
+            /* Route Screen */
+            .route-screen { background: #f3f4f6; }
+            .header {
+                background: white;
+                padding: 20px;
+                border-bottom: 1px solid #e5e7eb;
+            }
+            .header h1 { font-size: 24px; font-weight: 700; }
+            .header p { color: #6b7280; margin-top: 4px; }
+            .customer-list { padding: 15px; }
+            .customer-card {
+                background: white;
+                border-radius: 12px;
+                padding: 16px;
+                margin-bottom: 12px;
+                border-left: 4px solid #6b7280;
+                cursor: pointer;
+            }
+            .customer-card:hover { opacity: 0.9; }
+            .customer-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+            .stop-number { font-size: 18px; font-weight: 700; color: #9ca3af; }
+            .status { padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; color: white; background: #6b7280; }
+            .customer-name { font-size: 18px; font-weight: 600; margin-bottom: 4px; }
+            .customer-address { color: #6b7280; font-size: 14px; margin-bottom: 12px; }
+            .stats { display: flex; gap: 12px; flex-wrap: wrap; font-size: 13px; color: #4b5563; }
+            .overdue { color: #dc2626; font-weight: 500; }
+            
+            /* Job Screen */
+            .job-screen { background: #f3f4f6; }
+            .job-header { background: white; padding: 20px; border-bottom: 1px solid #e5e7eb; }
+            .job-header h1 { font-size: 24px; font-weight: 700; }
+            .job-header p { color: #6b7280; margin-top: 4px; }
+            .timer-card {
+                background: white;
+                margin: 15px;
+                padding: 25px;
+                border-radius: 16px;
+                text-align: center;
+                border: 2px solid #e5e7eb;
+            }
+            .timer-card.active { border-color: #16a34a; background: #dcfce7; }
+            .timer-label { font-size: 14px; color: #6b7280; text-transform: uppercase; font-weight: 600; }
+            .timer-display { font-size: 48px; font-weight: 700; margin: 15px 0; font-family: monospace; }
+            .actions { display: flex; gap: 12px; padding: 0 15px; margin-bottom: 15px; }
+            .action-btn {
+                flex: 1;
+                background: white;
+                padding: 20px;
+                border-radius: 12px;
+                text-align: center;
+                cursor: pointer;
+                border: none;
+            }
+            .action-btn.complete { background: #16a34a; color: white; }
+            .action-emoji { font-size: 28px; margin-bottom: 8px; display: block; }
+            .details-card {
+                background: white;
+                margin: 15px;
+                padding: 20px;
+                border-radius: 12px;
+            }
+            .section-title { font-size: 18px; font-weight: 700; margin-bottom: 15px; }
+            .detail-row { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f3f4f6; }
+            .detail-label { color: #6b7280; }
+            .detail-value { font-weight: 500; }
+            .back-btn {
+                padding: 16px;
+                background: white;
+                border-top: 1px solid #e5e7eb;
+                text-align: center;
+                color: #6b7280;
+                cursor: pointer;
+            }
+            
+            /* Complete Screen */
+            .complete-screen { background: #f3f4f6; }
+            .complete-header { background: white; padding: 20px; border-bottom: 1px solid #e5e7eb; }
+            .complete-header h2 { font-size: 14px; color: #6b7280; text-transform: uppercase; }
+            .complete-header h1 { font-size: 22px; font-weight: 700; margin-top: 4px; }
+            .section { background: white; margin: 15px; padding: 20px; border-radius: 12px; }
+            .section h3 { font-size: 16px; font-weight: 600; margin-bottom: 15px; }
+            .options { display: flex; flex-wrap: wrap; gap: 10px; }
+            .option {
+                padding: 10px 16px;
+                border-radius: 20px;
+                border: 1px solid #e5e7eb;
+                background: #f9fafb;
+                cursor: pointer;
+            }
+            .option.selected { background: #16a34a; color: white; border-color: #16a34a; }
+            textarea {
+                width: 100%;
+                padding: 15px;
+                border: 1px solid #e5e7eb;
+                border-radius: 12px;
+                font-size: 16px;
+                min-height: 100px;
+                resize: vertical;
+            }
+            .complete-btn {
+                margin: 15px;
+                padding: 18px;
+                background: #16a34a;
+                color: white;
+                border: none;
+                border-radius: 12px;
+                font-size: 18px;
+                font-weight: 700;
+                cursor: pointer;
+            }
+        </style>
+    </head>
+    <body>
+        <!-- Login Screen -->
+        <div id="login-screen" class="screen login-screen active">
+            <div class="login-card">
+                <div class="logo">
+                    <div class="logo-emoji">🌿</div>
+                    <h1>LawnOps</h1>
+                    <p>Technician Portal (Test Mode)</p>
+                </div>
+                
+                <div id="login-error" class="error"></div>
+                
+                <div class="form-group">
+                    <label class="form-label">Technician Name</label>
+                    <input type="text" id="tech-name" class="form-input" value="John Smith" placeholder="Enter your name">
+                </div>
+                
+                <button class="btn" onclick="login()">Sign In</button>
+                <p style="text-align: center; margin-top: 15px; font-size: 13px; color: #6b7280;">
+                    Try: John Smith, Mikey, alan newell
+                </p>
+            </div>
+        </div>
+
+        <!-- Route Screen -->
+        <div id="route-screen" class="screen route-screen">
+            <div class="header">
+                <h1>Today's Route</h1>
+                <p id="route-info">Loading...</p>
+            </div>
+            <div id="customer-list" class="customer-list">
+                <!-- Customers loaded here -->
+            </div>
+            <div class="back-btn" onclick="logout()">Sign Out</div>
+        </div>
+
+        <!-- Job Screen -->
+        <div id="job-screen" class="screen job-screen">
+            <div class="job-header">
+                <h1 id="job-customer-name">Customer Name</h1>
+                <p id="job-customer-address">Address</p>
+            </div>
+            
+            <div id="timer-card" class="timer-card">
+                <div class="timer-label">Timer</div>
+                <div id="timer-display" class="timer-display">00:00:00</div>
+                <button id="start-btn" class="btn" onclick="startTimer()" style="max-width: 200px;">Start Job</button>
+                <div id="tracking-status" style="display: none; color: #16a34a; font-weight: 500;">● GPS Active</div>
+            </div>
+            
+            <div class="actions">
+                <button class="action-btn" onclick="navigate()">
+                    <span class="action-emoji">🗺️</span>
+                    Navigate
+                </button>
+                <button class="action-btn" onclick="resetCurrentTimer()" style="background: #f59e0b; color: white;">
+                    <span class="action-emoji">🔄</span>
+                    Reset Timer
+                </button>
+                <button class="action-btn complete" onclick="showComplete()">
+                    <span class="action-emoji">✅</span>
+                    Complete
+                </button>
+            </div>
+            
+            <div class="details-card">
+                <h2 class="section-title">Property Details</h2>
+                <div id="job-details"></div>
+            </div>
+            
+            <div class="back-btn" onclick="showRoute()">← Back to Route</div>
+        </div>
+
+        <!-- Complete Screen -->
+        <div id="complete-screen" class="screen complete-screen">
+            <div class="complete-header">
+                <h2>Complete Service</h2>
+                <h1 id="complete-customer-name">Customer</h1>
+                <div id="current-round-display" style="color: #16a34a; font-size: 0.9rem; margin-top: 0.5rem;">Round 1</div>
+            </div>
+            
+            <div class="section">
+                <h3>Lawn Condition Rating (0-100)</h3>
+                <div style="margin: 1rem 0;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                        <span style="font-size: 0.85rem; color: #6b7280;">Before: <span id="rating-before-value">50</span></span>
+                        <span style="font-size: 0.85rem; color: #6b7280;">0 = Poor, 100 = Excellent</span>
+                    </div>
+                    <input type="range" id="rating-before" min="0" max="100" value="50" 
+                           style="width: 100%; height: 8px; border-radius: 4px; background: #e5e7eb; outline: none; -webkit-appearance: none;"
+                           oninput="document.getElementById('rating-before-value').textContent = this.value">
+                </div>
+                <div style="margin: 1rem 0;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                        <span style="font-size: 0.85rem; color: #6b7280;">After: <span id="rating-after-value">75</span></span>
+                    </div>
+                    <input type="range" id="rating-after" min="0" max="100" value="75" 
+                           style="width: 100%; height: 8px; border-radius: 4px; background: #e5e7eb; outline: none; -webkit-appearance: none;"
+                           oninput="document.getElementById('rating-after-value').textContent = this.value">
+                </div>
+            </div>
+            
+            <div class="section">
+                <h3>Products Used (Auto-populated from Round <span id="round-number">1</span>)</h3>
+                <div id="auto-chemicals" style="background: #f3f4f6; padding: 1rem; border-radius: 8px; margin-bottom: 0.5rem; font-size: 0.9rem; color: #374151;">
+                    Loading chemicals...
+                </div>
+                <textarea id="chemicals" placeholder="Additional products used..." style="margin-top: 0.5rem;"></textarea>
+            </div>
+            
+            <div class="section">
+                <h3>Service Notes</h3>
+                <textarea id="notes" placeholder="Any issues or observations..."></textarea>
+            </div>
+            
+            <button class="complete-btn" onclick="completeJob()">✓ Complete Job</button>
+            <div class="back-btn" onclick="showJobScreen()">Cancel</div>
+        </div>
+
+        <script>
+            // State
+            let currentTech = null;
+            let currentRoute = [];
+            let currentCustomer = null;
+            let customerTimers = {}; // Per-customer timers: { customerId: { startTime, elapsed, interval } }
+            let currentRound = 1;
+            let currentTreatments = []; // Store treatments for current round
+
+            // Navigation
+            function showScreen(id) {
+                document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+                document.getElementById(id).classList.add('active');
+            }
+
+            // Login
+            async function login() {
+                const name = document.getElementById('tech-name').value;
+                const errorDiv = document.getElementById('login-error');
+                
+                try {
+                    const formData = new FormData();
+                    formData.append('tech_name', name);
+                    
+                    const res = await fetch('/api/tech/login', { method: 'POST', body: formData });
+                    const data = await res.json();
+                    
+                    if (data.status === 'success') {
+                        currentTech = data;
+                        errorDiv.classList.remove('show');
+                        await loadRoute();
+                        showScreen('route-screen');
+                    } else {
+                        errorDiv.textContent = data.message || 'Login failed';
+                        errorDiv.classList.add('show');
+                    }
+                } catch (e) {
+                    errorDiv.textContent = 'Error: ' + e.message;
+                    errorDiv.classList.add('show');
+                }
+            }
+
+            function logout() {
+                currentTech = null;
+                currentRoute = [];
+                customerTimers = {}; // Clear all timers on logout
+                showScreen('login-screen');
+            }
+
+            // Load Route
+            async function loadRoute() {
+                try {
+                    // Pass tech_id from login to filter by territory
+                    const techId = currentTech?.tech_id || '';
+                    const res = await fetch(`/api/tech/my-route?tech_id=${techId}`);
+                    const data = await res.json();
+                    
+                    if (data.status === 'success') {
+                        currentRoute = data.customers;
+                        document.getElementById('route-info').textContent = 
+                            `${data.technician_name} • ${data.customer_count} stops`;
+                        // Load grass types for the location
+                        await loadGrassTypes();
+                        renderCustomers();
+                    }
+                } catch (e) {
+                    document.getElementById('route-info').textContent = 'Error loading route';
+                }
+            }
+            
+            async function loadGrassTypes() {
+                try {
+                    // Get location_id from currentTech (set during login) or fetch from /me
+                    let locationId = currentTech?.location_id;
+                    
+                    if (!locationId) {
+                        // Fetch from /me endpoint
+                        const meRes = await fetch('/me');
+                        const meData = await meRes.json();
+                        locationId = meData.location_id;
+                    }
+                    
+                    // If still no location, fetch all locations and use first one
+                    if (!locationId) {
+                        const locRes = await fetch('/locations');
+                        const locData = await locRes.json();
+                        if (locData.locations && locData.locations.length > 0) {
+                            locationId = locData.locations[0].id;
+                        }
+                    }
+                    
+                    // Fetch grass types for this location
+                    let url = '/treatment-plans';
+                    if (locationId) {
+                        url += `?location_id=${locationId}`;
+                    }
+                    
+                    const res = await fetch(url);
+                    if (!res.ok) throw new Error("API error: " + res.status);
+                    const data = await res.json();
+                    grassTypes = data.grassTypes || [];
+                    console.log('Loaded grass types for location', locationId, ':', grassTypes);
+                } catch (e) {
+                    console.error("Error loading grass types:", e);
+                    grassTypes = [];
+                }
+            }
+
+            function renderCustomers() {
+                const list = document.getElementById('customer-list');
+                console.log('Tech-test renderCustomers - grassTypes:', grassTypes);
+                list.innerHTML = currentRoute.map((c, i) => {
+                    console.log('  Customer', c.name, 'grass_type_id:', c.grass_type_id, 'grass_type_name:', c.grass_type_name);
+                    return `
+                    <div class="customer-card" onclick="showJob(${c.id})">
+                        <div class="customer-header">
+                            <span class="stop-number">${i + 1}</span>
+                            <span class="status">Pending</span>
+                        </div>
+                        <div class="customer-name">${c.name}</div>
+                        <div class="customer-address">${c.address}</div>
+                        <div class="stats">
+                            <span>📐 ${c.sqft.toLocaleString()} sqft</span>
+                            ${c.days_since_service > 45 ? `<span class="overdue">⚠️ ${Math.floor(c.days_since_service)} days</span>` : ''}
+                        </div>
+                        <div style="margin-top: 10px; padding-top: 8px; border-top: 1px solid #e5e7eb;">
+                            <div style="font-size: 11px; color: #6b7280; margin-bottom: 4px; font-weight: 600;">GRASS TYPE:</div>
+                            <div style="display: flex; flex-wrap: wrap; gap: 6px;" onclick="event.stopPropagation();">
+                                ${grassTypes.length > 0 ? grassTypes.map(gt => {
+                                    const isChecked = c.grass_type_id === gt.id;
+                                    console.log('    Checkbox for', gt.name, 'id:', gt.id, 'checked:', isChecked);
+                                    return `
+                                        <label style="display: flex; align-items: center; gap: 3px; padding: 4px 8px; background: ${isChecked ? '#dcfce7' : '#f3f4f6'}; border-radius: 12px; border: 1px solid ${isChecked ? '#16a34a' : '#e5e7eb'}; cursor: pointer; font-size: 11px;" onclick="event.stopPropagation();">
+                                            <input type="checkbox" ${isChecked ? 'checked' : ''} onchange="updateGrassType(${c.id}, ${gt.id}, this.checked)" style="cursor: pointer; width: 12px; height: 12px;">
+                                            <span>${gt.name}</span>
+                                        </label>
+                                    `;
+                                }).join('') : '<span style="color: #9ca3af; font-size: 11px;">No grass types</span>'}
+                            </div>
+                            ${c.grass_type_name ? `<div style="margin-top: 6px; font-size: 11px; color: #16a34a; font-weight: 500;">✓ Assigned: ${c.grass_type_name}</div>` : ''}
+                        </div>
+                    </div>
+                `}).join('');
+            }
+
+            // Job Screen
+            async function showJob(customerId) {
+                console.log('showJob called for customer:', customerId);
+                const customer = currentRoute.find(c => c.id === customerId);
+                if (!customer) {
+                    console.log('Customer not found');
+                    return;
+                }
+                
+                currentCustomer = customer;
+                document.getElementById('job-customer-name').textContent = customer.name;
+                document.getElementById('job-customer-address').textContent = customer.address;
+                
+                // Restore this customer's timer state
+                console.log('customerTimers:', customerTimers);
+                const timer = customerTimers[customerId];
+                console.log('Timer for customer:', timer);
+                
+                updateTimerDisplay();
+                
+                if (timer && timer.interval) {
+                    // Timer is running
+                    console.log('Timer is running, hiding start button');
+                    document.getElementById('start-btn').style.display = 'none';
+                    document.getElementById('tracking-status').style.display = 'block';
+                    document.getElementById('timer-card').classList.add('active');
+                } else {
+                    // Timer not running
+                    console.log('Timer not running, showing start button');
+                    document.getElementById('start-btn').style.display = 'inline-block';
+                    document.getElementById('tracking-status').style.display = 'none';
+                    document.getElementById('timer-card').classList.remove('active');
+                }
+                
+                // Load full details
+                try {
+                    const res = await fetch(`/api/tech/customer/${customerId}`);
+                    const data = await res.json();
+                    if (data.status === 'success') {
+                        const c = data.customer;
+                        document.getElementById('job-details').innerHTML = `
+                            <div class="detail-row"><span class="detail-label">Square Footage</span><span class="detail-value">${c.sqft.toLocaleString()} sqft</span></div>
+                            <div class="detail-row"><span class="detail-label">Last Service</span><span class="detail-value">${c.last_service_date ? new Date(c.last_service_date).toLocaleDateString() : 'Never'}</span></div>
+                            ${c.phone ? `<div class="detail-row"><span class="detail-label">Phone</span><span class="detail-value">${c.phone}</span></div>` : ''}
+                            ${c.notes ? `<div class="detail-row"><span class="detail-label">Notes</span><span class="detail-value">${c.notes}</span></div>` : ''}
+                        `;
+                    }
+                } catch (e) {
+                    document.getElementById('job-details').innerHTML = '<p>Error loading details</p>';
+                }
+                
+                showScreen('job-screen');
+            }
+
+            async function updateGrassType(customerId, grassTypeId, isChecked) {
+                try {
+                    const formData = new FormData();
+                    formData.append('rowid', customerId);
+                    formData.append('grass_type_id', isChecked ? grassTypeId.toString() : '');
+                    
+                    const res = await fetch('/update_grass_type', { method: 'POST', body: formData });
+                    const data = await res.json();
+                    
+                    if (data.status === 'success') {
+                        // Reload route to show updated assignment
+                        await loadRoute();
+                    } else {
+                        alert('Failed to update grass type: ' + (data.message || 'Unknown error'));
+                    }
+                } catch (e) {
+                    console.error('Update grass type error:', e);
+                    alert('Failed to update grass type');
+                }
+            }
+
+            function showRoute() {
+                showScreen('route-screen');
+            }
+
+            // Timer - per customer
+            function startTimer() {
+                console.log('startTimer called, currentCustomer:', currentCustomer);
+                if (!currentCustomer) {
+                    console.log('No currentCustomer, returning');
+                    return;
+                }
+                
+                const customerId = currentCustomer.id;
+                console.log('Starting timer for customer:', customerId);
+                let timer = customerTimers[customerId];
+                
+                if (!timer) {
+                    console.log('Creating new timer object');
+                    timer = { elapsed: 0, startTime: null, interval: null };
+                    customerTimers[customerId] = timer;
+                }
+                
+                // Don't start if already running
+                if (timer.interval) {
+                    console.log('Timer already running');
+                    return;
+                }
+                
+                timer.startTime = Date.now() - timer.elapsed;
+                timer.interval = setInterval(() => updateTimer(customerId), 100);
+                console.log('Timer started, interval ID:', timer.interval);
+                
+                document.getElementById('start-btn').style.display = 'none';
+                document.getElementById('tracking-status').style.display = 'block';
+                document.getElementById('timer-card').classList.add('active');
+            }
+
+            function stopTimer(customerId) {
+                if (!customerId && currentCustomer) customerId = currentCustomer.id;
+                if (!customerId) return;
+                
+                const timer = customerTimers[customerId];
+                if (timer && timer.interval) {
+                    clearInterval(timer.interval);
+                    timer.interval = null;
+                }
+            }
+            
+            function resetTimer(customerId) {
+                if (!customerId && currentCustomer) customerId = currentCustomer.id;
+                if (!customerId) return;
+                
+                stopTimer(customerId);
+                customerTimers[customerId] = { elapsed: 0, startTime: null, interval: null };
+                updateTimerDisplay();
+            }
+
+            function updateTimer(customerId) {
+                const timer = customerTimers[customerId];
+                if (!timer || !timer.startTime) return;
+                
+                timer.elapsed = Date.now() - timer.startTime;
+                
+                // Only update display if viewing this customer
+                if (currentCustomer && currentCustomer.id === customerId) {
+                    updateTimerDisplay();
+                }
+            }
+            
+            function updateTimerDisplay() {
+                if (!currentCustomer) return;
+                
+                const timer = customerTimers[currentCustomer.id];
+                const elapsed = timer ? timer.elapsed : 0;
+                
+                const totalSeconds = Math.floor(elapsed / 1000);
+                const hours = Math.floor(totalSeconds / 3600);
+                const minutes = Math.floor((totalSeconds % 3600) / 60);
+                const seconds = totalSeconds % 60;
+                document.getElementById('timer-display').textContent = 
+                    `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            }
+
+            function getElapsedMinutes(customerId) {
+                if (!customerId) customerId = currentCustomer?.id;
+                if (!customerId) return 0;
+                
+                const timer = customerTimers[customerId];
+                if (!timer) return 0;
+                
+                // Calculate current elapsed if timer is running
+                if (timer.interval && timer.startTime) {
+                    return Math.floor((Date.now() - timer.startTime) / 60000);
+                }
+                return Math.floor(timer.elapsed / 60000);
+            }
+
+            function resetCurrentTimer() {
+                if (!currentCustomer) return;
+                
+                if (confirm('Reset timer for this customer?')) {
+                    resetTimer(currentCustomer.id);
+                    document.getElementById('start-btn').style.display = 'inline-block';
+                    document.getElementById('tracking-status').style.display = 'none';
+                    document.getElementById('timer-card').classList.remove('active');
+                }
+            }
+
+            function navigate() {
+                if (currentCustomer && currentCustomer.lat) {
+                    window.open(`https://maps.google.com/?q=${currentCustomer.lat},${currentCustomer.lng}`, '_blank');
+                } else {
+                    alert('No coordinates available');
+                }
+            }
+
+            // Calculate current round based on day of year
+            function getCurrentRound() {
+                const now = new Date();
+                const startOfYear = new Date(now.getFullYear(), 0, 1);
+                const dayOfYear = Math.floor((now - startOfYear) / (1000 * 60 * 60 * 24)) + 1;
+                const daysBetweenService = 41; // Based on 9 rounds per year
+                const round = Math.ceil(dayOfYear / daysBetweenService);
+                return Math.min(Math.max(round, 1), 9); // Clamp between 1-9
+            }
+
+            // Load treatments for current round
+            async function loadCurrentRoundTreatments() {
+                try {
+                    currentRound = getCurrentRound();
+                    document.getElementById('current-round-display').textContent = `Round ${currentRound}`;
+                    document.getElementById('round-number').textContent = currentRound;
+                    
+                    // Get customer's grass type
+                    const grassTypeId = currentCustomer?.grass_type_id;
+                    if (!grassTypeId) {
+                        document.getElementById('auto-chemicals').textContent = 'No grass type assigned - chemicals not available';
+                        return;
+                    }
+                    
+                    // Fetch treatments for this plan
+                    const res = await fetch(`/treatment-plans/${grassTypeId}/treatments`);
+                    const data = await res.json();
+                    
+                    if (data.treatments && data.treatments.length > 0) {
+                        currentTreatments = data.treatments;
+                        // Find treatment for current round
+                        const currentTreatment = data.treatments.find(t => t.treatment_number === currentRound);
+                        
+                        if (currentTreatment && currentTreatment.chemicals) {
+                            const chemicals = JSON.parse(currentTreatment.chemicals);
+                            const chemText = chemicals.length > 0 ? chemicals.join(', ') : 'No chemicals specified for this round';
+                            document.getElementById('auto-chemicals').textContent = chemText;
+                            // Also populate the textarea as default
+                            document.getElementById('chemicals').value = chemText;
+                        } else {
+                            document.getElementById('auto-chemicals').textContent = `No treatment defined for round ${currentRound}`;
+                        }
+                    } else {
+                        document.getElementById('auto-chemicals').textContent = 'No treatments available';
+                    }
+                } catch (e) {
+                    console.error('Error loading treatments:', e);
+                    document.getElementById('auto-chemicals').textContent = 'Error loading chemicals';
+                }
+            }
+
+            // Complete Screen
+            function showComplete() {
+                if (!currentCustomer) return;
+                
+                const timer = customerTimers[currentCustomer.id];
+                if (!timer || (!timer.interval && timer.elapsed === 0)) {
+                    alert('Please start the timer first');
+                    return;
+                }
+                
+                document.getElementById('complete-customer-name').textContent = currentCustomer.name;
+                
+                // Load treatments for current round
+                loadCurrentRoundTreatments();
+                
+                showScreen('complete-screen');
+            }
+
+            function showJobScreen() {
+                showScreen('job-screen');
+            }
+
+
+            // Complete Job
+            async function completeJob() {
+                if (!currentCustomer) return;
+                
+                const customerId = currentCustomer.id;
+                const durationMinutes = getElapsedMinutes(customerId);
+                
+                // Get ratings (0-100)
+                const ratingBefore = document.getElementById('rating-before').value;
+                const ratingAfter = document.getElementById('rating-after').value;
+                
+                // Convert ratings to condition text for backend compatibility
+                const ratingToCondition = (r) => {
+                    if (r < 25) return 'Poor';
+                    if (r < 50) return 'Fair';
+                    if (r < 75) return 'Good';
+                    return 'Excellent';
+                };
+                
+                const conditionBefore = ratingToCondition(ratingBefore);
+                const conditionAfter = ratingToCondition(ratingAfter);
+                
+                // Combine auto-populated + manual chemicals
+                const autoChemicals = document.getElementById('auto-chemicals').textContent;
+                const manualChemicals = document.getElementById('chemicals').value;
+                const allChemicals = [autoChemicals, manualChemicals].filter(c => c && c !== 'No chemicals specified for this round' && c !== 'No grass type assigned - chemicals not available' && c !== `No treatment defined for round ${currentRound}` && c !== 'No treatments available' && c !== 'Error loading chemicals').join(', ');
+                
+                const notes = document.getElementById('notes').value;
+                
+                const formData = new FormData();
+                formData.append('customer_id', customerId);
+                formData.append('condition_before', conditionBefore);
+                formData.append('condition_after', conditionAfter);
+                formData.append('rating_before', ratingBefore);
+                formData.append('rating_after', ratingAfter);
+                formData.append('round_number', currentRound);
+                formData.append('chemicals_used', JSON.stringify(allChemicals.split(',').map(c => c.trim()).filter(Boolean)));
+                formData.append('notes', notes);
+                formData.append('duration_minutes', durationMinutes);
+                formData.append('labor_hours', (durationMinutes / 60).toFixed(2));
+                
+                try {
+                    const res = await fetch('/api/tech/complete-job', { method: 'POST', body: formData });
+                    const data = await res.json();
+                    
+                    if (data.status === 'success') {
+                        alert(`Job completed! Round ${currentRound} - Duration: ${durationMinutes} minutes`);
+                        resetTimer(customerId); // Clear this customer's timer
+                        await loadRoute();
+                        showRoute();
+                    } else {
+                        alert('Error: ' + data.message);
+                    }
+                } catch (e) {
+                    alert('Network error - job saved locally (demo mode)');
+                    resetTimer(customerId);
+                    showRoute();
+                }
+            }
+
+            // Enter key on login
+            document.getElementById('tech-name').addEventListener('keypress', e => {
+                if (e.key === 'Enter') login();
+            });
+        </script>
+    </body>
+    </html>
+    """

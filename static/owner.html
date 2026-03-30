@@ -298,6 +298,177 @@
       font-size: 0.8rem;
     }
 
+    /* COMPACT TREATMENT ROUNDS */
+    .grass-type-section {
+      background: var(--bg-light);
+      border: 1px solid var(--border-color);
+      border-radius: 0.5rem;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .grass-type-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.75rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .grass-type-name {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--primary);
+    }
+
+    .treatment-container {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 0.75rem;
+    }
+
+    .treatment {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 0.375rem;
+      padding: 0.75rem;
+      transition: all 0.2s ease;
+      font-size: 0.85rem;
+    }
+
+    .treatment:hover {
+      border-color: var(--primary-light);
+      box-shadow: var(--shadow-md);
+    }
+
+    .treatment.dragging {
+      opacity: 0.5;
+    }
+
+    .treatment.drag-over {
+      border-top: 2px solid var(--primary);
+    }
+
+    .treatment-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.5rem;
+      cursor: move;
+      user-select: none;
+    }
+
+    .treatment-title {
+      font-weight: 600;
+      color: var(--text-primary);
+      font-size: 0.9rem;
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+    }
+
+    .treatment-title small {
+      font-size: 0.7rem;
+      color: var(--text-secondary);
+      font-weight: 400;
+    }
+
+    /* Searchable Dropdown */
+    .searchable-dropdown {
+      position: relative;
+    }
+
+    .dropdown-search {
+      width: 100%;
+      padding: 0.4rem 0.5rem;
+      border: 1px solid var(--border-color);
+      border-radius: 0.25rem;
+      font-size: 0.8rem;
+      background: var(--bg-light);
+    }
+
+    .dropdown-search:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+
+    .dropdown-list {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      max-height: 200px;
+      overflow-y: auto;
+      background: var(--bg-light);
+      border: 1px solid var(--border-color);
+      border-top: none;
+      border-radius: 0 0 0.25rem 0.25rem;
+      z-index: 100;
+      display: none;
+      box-shadow: var(--shadow-lg);
+    }
+
+    .dropdown-list.show {
+      display: block;
+    }
+
+    .dropdown-item {
+      padding: 0.4rem 0.5rem;
+      cursor: pointer;
+      font-size: 0.8rem;
+      border-bottom: 1px solid var(--gray-100);
+    }
+
+    .dropdown-item:hover {
+      background: var(--primary-light);
+    }
+
+    .dropdown-item:last-child {
+      border-bottom: none;
+    }
+
+    /* Compact lists */
+    .treatment .item-list {
+      list-style: none;
+      margin: 0.25rem 0 0 0;
+      padding: 0;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.25rem;
+    }
+
+    .treatment .item-list li {
+      background: var(--bg-light);
+      border: 1px solid var(--border-color);
+      border-radius: 0.25rem;
+      padding: 0.2rem 0.4rem;
+      font-size: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+    }
+
+    .treatment .btn-sm {
+      padding: 0.15rem 0.3rem;
+      font-size: 0.7rem;
+    }
+
+    .treatment .form-group {
+      margin-bottom: 0.5rem;
+    }
+
+    .treatment .form-label {
+      font-size: 0.75rem;
+      margin-bottom: 0.25rem;
+    }
+
+    .treatment .note-input {
+      padding: 0.4rem 0.5rem;
+      font-size: 0.8rem;
+    }
+
     /* GRASS TYPE SECTIONS */
     .grass-type-section {
       background: var(--bg-light);
@@ -615,6 +786,27 @@
 
     <!-- ==================== TREATMENT PLANS TAB ==================== -->
     <div id="treatments" class="tab-content active">
+      <!-- Location Selector for Treatment Plans -->
+      <div class="form-panel" style="background: var(--primary-light); border-color: var(--primary);">
+        <h3><i class="fas fa-map-marker-alt"></i> Location Required</h3>
+        <p style="color: var(--text-secondary); margin: 0 0 1rem 0; font-size: 0.9rem;">
+          Select a location to view or create location-specific treatment plans. 
+          <strong>All treatment plans must be associated with a location.</strong>
+        </p>
+        <div class="form-row">
+          <div class="form-group" style="flex: 1;">
+            <label class="form-label">Select Location *</label>
+            <select id="treatmentPlanLocationFilter" class="form-input">
+            </select>
+          </div>
+          <div class="form-group" style="display: flex; align-items: flex-end;">
+            <button id="refreshTreatmentPlansBtn" class="btn btn-secondary">
+              <i class="fas fa-sync"></i> Refresh
+            </button>
+          </div>
+        </div>
+      </div>
+
       <!-- Add Grass Type -->
       <div class="form-panel">
         <h3><i class="fas fa-leaf"></i> Add Grass Type</h3>
@@ -624,6 +816,9 @@
         <button id="addGrassTypeBtn" class="btn btn-primary">
           <i class="fas fa-plus"></i> Add Grass Type
         </button>
+        <p id="selectedLocationInfo" style="color: var(--error); margin: 0.5rem 0 0 0; font-size: 0.85rem; font-style: italic;">
+          Please select a location above to add treatment plans
+        </p>
       </div>
 
       <div style="display: grid; grid-template-columns: 1fr 320px; gap: 2rem; align-items: start;">
@@ -686,9 +881,13 @@
               <input type="text" id="newLocPhone" class="form-input" placeholder="e.g. (555) 123-4567" />
             </div>
           </div>
-          <button id="addLocationBtn" class="btn btn-primary">
-            <i class="fas fa-plus"></i> Add Location
-          </button>
+          <div class="form-row">
+            <div class="form-group" style="display: flex; align-items: flex-end;">
+              <button id="addLocationBtn" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Add Location
+              </button>
+            </div>
+          </div>
         </div>
 
         <!-- Locations List -->
@@ -768,18 +967,19 @@
 
         <!-- Technicians List -->
         <div style="margin-top: 2rem;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
             <h3 style="margin: 0; color: var(--text-primary);">
               <i class="fas fa-list"></i> Technicians
             </h3>
-            <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+              <input type="text" id="technicianSearch" placeholder="Search technicians..." style="padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px; background: white; min-width: 150px;">
               <label style="font-weight: 600; color: #374151;">Filter by Location:</label>
               <select id="technicianLocationFilter" style="padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px; background: white;">
                 <option value="">All Locations</option>
               </select>
             </div>
           </div>
-          <div id="techniciansList" style="display: grid; gap: 1rem;"></div>
+          <div id="techniciansList" style="display: grid; gap: 1rem; max-height: 500px; overflow-y: auto; padding-right: 0.5rem;"></div>
         </div>
       </div>
     </div>
@@ -839,43 +1039,42 @@
         </div>
       </div>
     </div>
-  </div>
 
-  <!-- Territory Drawing Modal -->
-  <div id="territoryModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10000; justify-content: center; align-items: center;">
-    <div style="background: white; border-radius: 12px; width: 90%; max-width: 1200px; height: 85%; display: flex; flex-direction: column; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);">
-      <!-- Modal Header -->
-      <div style="padding: 1.5rem; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center;">
-        <h2 style="margin: 0; color: #1f2937; font-size: 1.5rem;">
-          <i class="fas fa-draw-polygon"></i> Draw Service Areas
-        </h2>
-        <button onclick="closeTerritoryModal()" style="background: none; border: none; font-size: 1.5rem; color: #6b7280; cursor: pointer;">&times;</button>
-      </div>
-      
-      <!-- Controls -->
-      <div style="padding: 1rem; border-bottom: 1px solid #e5e7eb; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
-        <div style="display: flex; align-items: center; gap: 0.5rem;">
-          <label style="font-weight: 600; color: #374151;">Technician:</label>
-          <select id="drawingTechnician" style="padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px;">
-            <option value="">Select technician...</option>
-          </select>
+    <!-- Territory Drawing Modal -->
+    <div id="territoryModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10000; justify-content: center; align-items: center;">
+      <div style="background: white; border-radius: 12px; width: 90%; max-width: 1200px; height: 85%; display: flex; flex-direction: column; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);">
+        <!-- Modal Header -->
+        <div style="padding: 1.5rem; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center;">
+          <h2 style="margin: 0; color: #1f2937; font-size: 1.5rem;">
+            <i class="fas fa-draw-polygon"></i> Draw Service Areas
+          </h2>
+          <button onclick="closeTerritoryModal()" style="background: none; border: none; font-size: 1.5rem; color: #6b7280; cursor: pointer;">&times;</button>
         </div>
-        <div style="display: flex; gap: 0.5rem;">
-          <button id="startDrawingBtn" class="btn btn-primary" style="font-size: 0.9rem;">
-            <i class="fas fa-pencil-alt"></i> Start Drawing
-          </button>
+        
+        <!-- Controls -->
+        <div style="padding: 1rem; border-bottom: 1px solid #e5e7eb; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <label style="font-weight: 600; color: #374151;">Technician:</label>
+            <select id="drawingTechnician" style="padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px;">
+              <option value="">Select technician...</option>
+            </select>
+          </div>
+          <div style="display: flex; gap: 0.5rem;">
+            <button id="startDrawingBtn" class="btn btn-primary" style="font-size: 0.9rem;">
+              <i class="fas fa-pencil-alt"></i> Start Drawing
+            </button>
+          </div>
+          <div id="drawingStatus" style="margin-left: auto; padding: 0.5rem 1rem; background: #fef3c7; color: #92400e; border-radius: 6px; font-size: 0.9rem; display: none;">
+            Click on the map to draw service area boundary
+          </div>
         </div>
-        <div id="drawingStatus" style="margin-left: auto; padding: 0.5rem 1rem; background: #fef3c7; color: #92400e; border-radius: 6px; font-size: 0.9rem; display: none;">
-          Click on the map to draw service area boundary
+        
+        <!-- Map Container -->
+        <div style="flex: 1; position: relative;">
+          <div id="territoryMap" style="width: 100%; height: 100%; border-radius: 0 0 12px 12px;"></div>
         </div>
-      </div>
-      
-      <!-- Map Container -->
-      <div style="flex: 1; position: relative;">
-        <div id="territoryMap" style="width: 100%; height: 100%; border-radius: 0 0 12px 12px;"></div>
       </div>
     </div>
-  </div>
   <script>
     const API_BASE = "";
 
@@ -902,7 +1101,21 @@
 
     async function loadAllData() {
       try {
-        const plansRes = await fetch(`${API_BASE}/treatment-plans`);
+        // Get selected location filter
+        const locationFilter = document.getElementById("treatmentPlanLocationFilter");
+        const locationId = locationFilter ? locationFilter.value : "";
+        
+        // Require location to be selected
+        if (!locationId) {
+          config.grassTypes = [];
+          renderAll();
+          return;
+        }
+        
+        // Build URL with location filter
+        const plansUrl = `${API_BASE}/treatment-plans?location_id=${locationId}`;
+        
+        const plansRes = await fetch(plansUrl);
         const plansData = await plansRes.json();
         config.grassTypes = plansData.grassTypes;
 
@@ -931,6 +1144,15 @@
     async function createGrassType(name) {
       const formData = new FormData();
       formData.append("grass_type_name", name);
+      
+      // Require location_id
+      const locationFilter = document.getElementById("treatmentPlanLocationFilter");
+      if (!locationFilter || !locationFilter.value) {
+        alert("Please select a location first");
+        return false;
+      }
+      formData.append("location_id", locationFilter.value);
+      
       try {
         const res = await fetch(`${API_BASE}/treatment-plans`, {
           method: "POST",
@@ -1180,29 +1402,35 @@
           <div class="treatment" data-treatment-id="${t.id}" draggable="true" ondragstart="dragStart(event)" ondragover="dragOver(event)" ondrop="dragDrop(event, ${plan.id})" ondragend="dragEnd(event)">
             <div class="treatment-header">
               <div class="treatment-title">
-                <i class="fas fa-arrows-alt"></i> Round ${t.number}
-                <small>(drag to reorder)</small>
+                <i class="fas fa-arrows-alt" style="font-size:0.7rem;color:var(--text-secondary)"></i> Round ${t.number}
               </div>
-              <button class="btn btn-sm btn-danger" onclick="deleteTreatmentUI(${t.id})"><i class="fas fa-trash"></i></button>
+              <button class="btn btn-sm btn-danger" onclick="deleteTreatmentUI(${t.id})"><i class="fas fa-trash" style="font-size:0.7rem"></i></button>
             </div>
             <div class="form-group">
               <label class="form-label">Chemicals</label>
-              <select data-treatment-id="${t.id}" class="form-select" onchange="selectChemicalUI(this, ${t.id})">
-                <option value="">-- Add a chemical --</option>
-                ${config.chemicalAutos.map(c => `<option value="${c}">${c}</option>`).join("")}
-              </select>
-              <ul class="item-list" style="margin-top: 0.5rem;">
+              <div class="searchable-dropdown" id="chem-dropdown-${t.id}">
+                <input type="text" 
+                       class="dropdown-search" 
+                       placeholder="Search chemicals..." 
+                       onfocus="showChemDropdown(${t.id})" 
+                       oninput="filterChemDropdown(${t.id}, this.value)"
+                       onblur="hideChemDropdownDelayed(${t.id})">
+                <div class="dropdown-list" id="chem-list-${t.id}">
+                  ${config.chemicalAutos.map(c => `<div class="dropdown-item" onclick="selectChemicalForTreatment(${t.id}, '${c.replace(/'/g, "\\'")}')">${c}</div>`).join("")}
+                </div>
+              </div>
+              <ul class="item-list">
                 ${t.chems.map((c, cIdx) => `<li>${c}<button class="btn btn-sm btn-danger" onclick="deleteChemUI(${t.id}, ${cIdx})"><i class="fas fa-times"></i></button></li>`).join("")}
               </ul>
             </div>
             <div class="form-group">
               <label class="form-label">Notes</label>
               <input type="text"
-                     placeholder="Add a note + Enter"
+                     placeholder="Add note + Enter"
                      data-treatment-id="${t.id}"
                      class="note-input form-input"
                      onkeydown="addNoteUI(event, ${t.id})"/>
-              <ul class="item-list" style="margin-top: 0.5rem;">
+              <ul class="item-list" style="margin-top: 0.25rem;">
                 ${t.notes.map((n, nIdx) => `<li>${n}<button class="btn btn-sm btn-danger" onclick="deleteNoteUI(${t.id}, ${nIdx})"><i class="fas fa-times"></i></button></li>`).join("")}
               </ul>
             </div>
@@ -1215,8 +1443,8 @@
             <div class="grass-type-name"><i class="fas fa-leaf"></i> ${plan.name}</div>
             <button class="btn btn-sm btn-danger" onclick="deleteGrassTypeUI(${plan.id})"><i class="fas fa-trash"></i></button>
           </div>
-          <button class="btn btn-primary" onclick="addTreatmentUI(${plan.id})" style="margin-bottom: 1rem;">
-            <i class="fas fa-plus"></i> Add Treatment
+          <button class="btn btn-primary" onclick="addTreatmentUI(${plan.id})" style="margin-bottom: 0.75rem; padding: 0.4rem 0.75rem; font-size: 0.85rem;">
+            <i class="fas fa-plus"></i> Add Round
           </button>
           <div class="treatment-container">${treatments}</div>
         </div>`;
@@ -1339,6 +1567,33 @@
       }
     }
 
+    // ============ TREATMENT PLAN LOCATION FILTER ============
+    document.getElementById("treatmentPlanLocationFilter")?.addEventListener("change", async () => {
+      await loadAllData();
+      updateLocationInfoText();
+    });
+
+    document.getElementById("refreshTreatmentPlansBtn")?.addEventListener("click", async () => {
+      await loadAllData();
+    });
+
+    function updateLocationInfoText() {
+      const locationFilter = document.getElementById("treatmentPlanLocationFilter");
+      const infoText = document.getElementById("selectedLocationInfo");
+      if (locationFilter && infoText) {
+        const locationId = locationFilter.value;
+        if (locationId) {
+          const location = locations.find(l => l.id == locationId);
+          const locationName = location ? location.name : 'Selected Location';
+          infoText.textContent = `Creating plan for: ${locationName}`;
+          infoText.style.color = 'var(--success)';
+        } else {
+          infoText.textContent = 'Please select a location above to add treatment plans';
+          infoText.style.color = 'var(--error)';
+        }
+      }
+    }
+
     // ============ DRAG AND DROP ============
     let draggedElement = null;
     let draggedSource = null;
@@ -1413,6 +1668,55 @@
       draggedSource = null;
     }
 
+    // ============ SEARCHABLE DROPDOWN FUNCTIONS ============
+    function showChemDropdown(treatmentId) {
+      const list = document.getElementById(`chem-list-${treatmentId}`);
+      if (list) {
+        list.classList.add('show');
+      }
+    }
+
+    function hideChemDropdownDelayed(treatmentId) {
+      // Delay to allow click events to fire
+      setTimeout(() => {
+        const list = document.getElementById(`chem-list-${treatmentId}`);
+        if (list) {
+          list.classList.remove('show');
+        }
+      }, 200);
+    }
+
+    function filterChemDropdown(treatmentId, searchValue) {
+      const list = document.getElementById(`chem-list-${treatmentId}`);
+      if (!list) return;
+
+      const items = list.querySelectorAll('.dropdown-item');
+      const searchLower = searchValue.toLowerCase();
+
+      items.forEach(item => {
+        const text = item.textContent.toLowerCase();
+        if (text.includes(searchLower)) {
+          item.style.display = 'block';
+        } else {
+          item.style.display = 'none';
+        }
+      });
+    }
+
+    function selectChemicalForTreatment(treatmentId, chemical) {
+      addChemicalToTreatment(treatmentId, chemical);
+      // Hide dropdown after selection
+      const list = document.getElementById(`chem-list-${treatmentId}`);
+      if (list) {
+        list.classList.remove('show');
+      }
+      // Clear search input
+      const input = document.querySelector(`#chem-dropdown-${treatmentId} .dropdown-search`);
+      if (input) {
+        input.value = '';
+      }
+    }
+
     // ============ OFFICE LOCATIONS MANAGEMENT ============
     async function loadLocations() {
       try {
@@ -1427,133 +1731,124 @@
 
     function renderLocationsList() {
       const container = document.getElementById("locationsList");
-      if (!locations || locations.length === 0) {
-        container.innerHTML = '<p style="color: #9ca3af;">No office locations added yet. Add one above to get started.</p>';
-        return;
-      }
 
-      container.innerHTML = locations.map(loc => `
-        <div class="location-card">
-          <div class="location-info">
-            <div class="location-name">${loc.name}</div>
-            ${loc.address ? `<div class="location-detail"><strong>Address:</strong> ${loc.address}</div>` : ''}
-            ${loc.service_area_zips ? `<div class="location-detail"><strong>Service Area:</strong> ${loc.service_area_zips}</div>` : ''}
-            ${loc.phone ? `<div class="location-detail"><strong>Phone:</strong> ${loc.phone}</div>` : ''}
-          </div>
-          <div class="location-actions">
-            <button class="btn btn-secondary btn-sm" onclick="editLocation(${loc.id})"><i class="fas fa-edit"></i> Edit</button>
-            <button class="btn btn-danger btn-sm" onclick="deleteLocationUI(${loc.id})"><i class="fas fa-trash"></i> Delete</button>
-          </div>
-        </div>
-      `).join("");
+  container.innerHTML = locations.map(loc => `
+    <div class="location-card">
+      <div class="location-info">
+        <div class="location-name">${loc.name}</div>
+        ${loc.address ? `<div class="location-detail"><strong>Address:</strong> ${loc.address}</div>` : ''}
+        ${loc.service_area_zips ? `<div class="location-detail"><strong>Service Area:</strong> ${loc.service_area_zips}</div>` : ''}
+        ${loc.phone ? `<div class="location-detail"><strong>Phone:</strong> ${loc.phone}</div>` : ''}
+        <div class="location-detail"><strong>Service Schedule:</strong> Based on treatment rounds</div>
+      </div>
+      <div class="location-actions">
+        <button class="btn btn-secondary btn-sm" onclick="editLocation(${loc.id})"><i class="fas fa-edit"></i> Edit</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteLocationUI(${loc.id})"><i class="fas fa-trash"></i> Delete</button>
+      </div>
+    </div>
+  `).join("");
+}
+
+async function addLocationUI() {
+  const name = document.getElementById("newLocName").value.trim();
+  const address = document.getElementById("newLocAddress").value.trim();
+  const zips = document.getElementById("newLocZips").value.trim();
+  const phone = document.getElementById("newLocPhone").value.trim();
+
+  if (!name) {
+    alert("Office location name is required");
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append("name", name);
+  formData.append("address", address);
+  formData.append("service_area_zips", zips);
+  formData.append("phone", phone);
+
+  try {
+    const res = await fetch(`${API_BASE}/locations`, {
+      method: "POST",
+      body: formData
+    });
+    const data = await res.json();
+
+    if (data.status === "success") {
+      document.getElementById("newLocName").value = "";
+      document.getElementById("newLocAddress").value = "";
+      document.getElementById("newLocZips").value = "";
+      document.getElementById("newLocPhone").value = "";
+      await loadLocations();
+    } else {
+      alert("Error: " + data.message);
     }
+  } catch (e) {
+    console.error("Add office location error:", e);
+    alert("Failed to add office location");
+  }
+}
 
-    async function addLocationUI() {
-      const name = document.getElementById("newLocName").value.trim();
-      const address = document.getElementById("newLocAddress").value.trim();
-      const zips = document.getElementById("newLocZips").value.trim();
-      const phone = document.getElementById("newLocPhone").value.trim();
+function editLocation(locId) {
+  const loc = locations.find(l => l.id === locId);
+  if (!loc) return;
 
-      if (!name) {
-        alert("Office location name is required");
-        return;
-      }
+  const name = prompt("Office location name:", loc.name);
+  if (name === null) return;
 
-      try {
-        const formData = new FormData();
-        formData.append("name", name);
-        formData.append("address", address);
-        formData.append("service_area_zips", zips);
-        formData.append("phone", phone);
+  const address = prompt("Address:", loc.address || "");
+  if (address === null) return;
 
-        const res = await fetch(`${API_BASE}/locations`, {
-          method: "POST",
-          body: formData
-        });
-        const data = await res.json();
+  const zips = prompt("Service area zip codes:", loc.service_area_zips || "");
+  if (zips === null) return;
 
-        if (data.status === "success") {
-          document.getElementById("newLocName").value = "";
-          document.getElementById("newLocAddress").value = "";
-          document.getElementById("newLocZips").value = "";
-          document.getElementById("newLocPhone").value = "";
-          await loadLocations();
-        } else {
-          alert("Error: " + data.message);
-        }
-      } catch (e) {
-        console.error("Add office location error:", e);
-        alert("Failed to add office location");
-      }
+  const phone = prompt("Phone:", loc.phone || "");
+  if (phone === null) return;
+
+  updateLocationUI(locId, name, address, zips, phone);
+}
+
+async function updateLocationUI(locId, name, address, zips, phone) {
+  try {
+    const formData = new FormData();
+    formData.append("name", name);
+    formData.append("address", address);
+    formData.append("service_area_zips", zips);
+    formData.append("phone", phone);
+
+    const res = await fetch(`${API_BASE}/locations/${locId}`, {
+      method: "POST",
+      body: formData
+    });
+    const data = await res.json();
+
+    if (data.status === "success") {
+      await loadLocations();
+    } else {
+      alert("Error: " + data.message);
     }
+  } catch (e) {
+    console.error("Update office location error:", e);
+    alert("Failed to update office location");
+  }
+}
 
-    function editLocation(locId) {
-      const loc = locations.find(l => l.id === locId);
-      if (!loc) return;
+async function deleteLocationFromDB(locId) {
+  try {
+    const res = await fetch(`${API_BASE}/locations/${locId}`, {
+      method: "DELETE"
+    });
+    const data = await res.json();
 
-      const name = prompt("Office location name:", loc.name);
-      if (name === null) return;
-
-      const address = prompt("Address:", loc.address || "");
-      if (address === null) return;
-
-      const zips = prompt("Service area zip codes:", loc.service_area_zips || "");
-      if (zips === null) return;
-
-      const phone = prompt("Phone:", loc.phone || "");
-      if (phone === null) return;
-
-      updateLocationUI(locId, name, address, zips, phone);
+    if (data.status === "success") {
+      await loadLocations();
+    } else {
+      alert("Error: " + data.message);
     }
-
-    async function updateLocationUI(locId, name, address, zips, phone) {
-      try {
-        const formData = new FormData();
-        formData.append("name", name);
-        formData.append("address", address);
-        formData.append("service_area_zips", zips);
-        formData.append("phone", phone);
-
-        const res = await fetch(`${API_BASE}/locations/${locId}`, {
-          method: "POST",
-          body: formData
-        });
-        const data = await res.json();
-
-        if (data.status === "success") {
-          await loadLocations();
-        } else {
-          alert("Error: " + data.message);
-        }
-      } catch (e) {
-        console.error("Update office location error:", e);
-        alert("Failed to update office location");
-      }
-    }
-
-    function deleteLocationUI(locId) {
-      if (confirm("Delete this office location? Make sure no customers are assigned to it first.")) {
-        deleteLocationFromDB(locId);
-      }
-    }
-
-    async function deleteLocationFromDB(locId) {
-      try {
-        const res = await fetch(`${API_BASE}/locations/${locId}`, {
-          method: "DELETE"
-        });
-        const data = await res.json();
-
-        if (data.status === "success") {
-          await loadLocations();
-        } else {
-          alert("Error: " + data.message);
-        }
-      } catch (e) {
-        console.error("Delete office location error:", e);
-        alert("Failed to delete office location");
-      }
-    }
+  } catch (error) {
+    console.error("Delete office location error:", error);
+    alert("Failed to delete office location");
+  }
+}
 
     // ============ TECHNICIANS MANAGEMENT ============
     async function loadTechnicians() {
@@ -1562,19 +1857,40 @@
         const data = await res.json();
         technicians = data.technicians || [];
         
-        // Apply location filtering for non-admin users
-        if (currentUserLocationId) {
-          const filteredTechnicians = technicians.filter(t => t.location_id === currentUserLocationId);
-          renderTechniciansList(filteredTechnicians);
-        } else {
-          renderTechniciansList(); // Admin sees all
-        }
+        // Apply both location and search filters
+        filterTechnicians();
         
         populateLocationSelects();
       } catch (e) {
         console.error("Load technicians error:", e);
       }
     }
+
+    function filterTechnicians() {
+      const locationId = document.getElementById("technicianLocationFilter")?.value || "";
+      const searchTerm = document.getElementById("technicianSearch")?.value.toLowerCase() || "";
+      
+      let filtered = technicians;
+      
+      // Filter by location
+      if (locationId) {
+        filtered = filtered.filter(t => t.location_id == locationId);
+      }
+      
+      // Filter by search term (name or location name)
+      if (searchTerm) {
+        filtered = filtered.filter(t => 
+          t.name.toLowerCase().includes(searchTerm) || 
+          (t.location_name && t.location_name.toLowerCase().includes(searchTerm))
+        );
+      }
+      
+      renderTechniciansList(filtered);
+    }
+
+    // Technician location filter and search event listeners
+    document.getElementById("technicianLocationFilter")?.addEventListener("change", filterTechnicians);
+    document.getElementById("technicianSearch")?.addEventListener("input", filterTechnicians);
 
     function renderTechniciansList(technicianList = technicians) {
       const container = document.getElementById("techniciansList");
@@ -1630,14 +1946,55 @@
             const optionExists = Array.from(select.options).some(opt => opt.value === currentValue);
             if (optionExists) {
               select.value = currentValue;
+            } else if (locations.length > 0) {
+              select.value = locations[0].id;
             }
+          } else if (locations.length > 0) {
+            select.value = locations[0].id;
           }
         }
       });
       
+      // Populate treatment plan location filter dropdown
+      const treatmentPlanFilterSelect = document.getElementById('treatmentPlanLocationFilter');
+      if (treatmentPlanFilterSelect) {
+        const currentValue = treatmentPlanFilterSelect.value;
+        treatmentPlanFilterSelect.innerHTML = '';
+        locations.forEach(loc => {
+          treatmentPlanFilterSelect.innerHTML += `<option value="${loc.id}">${loc.name}</option>`;
+        });
+        // Auto-select first location if none selected or current not valid
+        if (currentValue && Array.from(treatmentPlanFilterSelect.options).some(opt => opt.value === currentValue)) {
+          treatmentPlanFilterSelect.value = currentValue;
+        } else if (locations.length > 0) {
+          treatmentPlanFilterSelect.value = locations[0].id;
+          // Load data for auto-selected location
+          loadAllData();
+          updateLocationInfoText();
+        }
+      }
+      
+      // Populate technician location filter dropdown
+      const technicianFilterSelect = document.getElementById('technicianLocationFilter');
+      if (technicianFilterSelect) {
+        const currentValue = technicianFilterSelect.value;
+        technicianFilterSelect.innerHTML = '<option value="">All Locations</option>';
+        locations.forEach(loc => {
+          technicianFilterSelect.innerHTML += `<option value="${loc.id}">${loc.name}</option>`;
+        });
+        // Restore previous selection
+        if (currentValue) {
+          const optionExists = Array.from(technicianFilterSelect.options).some(opt => opt.value === currentValue);
+          if (optionExists) {
+            technicianFilterSelect.value = currentValue;
+          }
+        }
+      }
+      
       // Populate office worker location filter dropdown
       const officeWorkerFilterSelect = document.getElementById('officeWorkerLocationFilter');
       if (officeWorkerFilterSelect) {
+        officeWorkerFilterSelect.innerHTML = '';
         officeWorkerFilterSelect.innerHTML = '<option value="">All Locations</option>';
         locations.forEach(loc => {
           officeWorkerFilterSelect.innerHTML += `<option value="${loc.id}">${loc.name}</option>`;
@@ -2032,18 +2389,10 @@
         const data = await response.json();
         
         if (data.customers && data.customers.length > 0) {
-          const now = new Date();
-          
-          // Customers are arrays like routing.html: [name, address, phone, sqft, price, cost, notes, last_service_date, status, id, lat, lng, days_since]
+          // Customers are arrays: [name, address, phone, sqft, price, cost, notes, last_service_date, status, id, lat, lng, days_since]
           // Indexes: 0=name, 1=address, 2=phone, 3=sqft, 7=last_service_date, 8=status, 9=id, 10=lat, 11=lng
-          const dueCustomers = data.customers.filter(c => {
-            const status = c[8]; // "due" or "not_due"
-            const lastService = c[7]; // last_service_date
-            if (!lastService) return true;
-            const lastDate = new Date(lastService);
-            const daysSince = (now - lastDate) / (1000 * 60 * 60 * 24);
-            return daysSince >= 45;
-          });
+          // API now returns status based on location-specific treatments_per_year
+          const dueCustomers = data.customers.filter(c => c[8] === "due");
           
           let pinsAdded = 0;
           dueCustomers.forEach(customer => {

@@ -1105,7 +1105,11 @@
                         userLocationEl.textContent = data.username || '';
                     } else if (data.user_type === 'office_worker') {
                         userNameEl.textContent = data.worker_name || data.username;
-                        userLocationEl.textContent = data.location_name || '';
+                        // Fetch location name
+                        const locRes = await fetch('/locations');
+                        const locData = await locRes.json();
+                        const location = locData.locations?.find(l => l.id === data.location_id);
+                        userLocationEl.textContent = location?.name || '';
                         
                         // Center map on user's location if coordinates available
                         if (data.location_lat && data.location_lng) {
