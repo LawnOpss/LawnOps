@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Top Turf Login Terminal</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background: #0a0a0a;
+            color: #00ff00;
+            font-size: 14px;
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .terminal {
+            width: 90%;
+            max-width: 800px;
+            height: 500px;
+            background: #000000;
+            border: 2px solid #00ff00;
+            border-radius: 8px;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            position: relative;
+        }
+
+        .terminal-header {
+            color: #00ff00;
+            font-size: 12px;
+            margin-bottom: 20px;
+            text-align: center;
+            opacity: 0.8;
+        }
+
+        .terminal-content {
+            flex: 1;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+        }
+
+        .command-line {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+
+        .prompt {
+            color: #00ff00;
+            margin-right: 10px;
+            font-weight: bold;
+        }
+
+        .command {
+            color: #ffffff;
+            flex: 1;
+        }
+
+        .output {
+            color: #00ff00;
+            margin: 5px 0;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .error {
+            color: #ff0000;
+        }
+
+        .success {
+            color: #00ff00;
+        }
+
+        .cursor {
+            display: inline-block;
+            width: 8px;
+            height: 16px;
+            background: #00ff00;
+            margin-left: 2px;
+            animation: blink 1s infinite;
+        }
+
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
+        }
+
+        .input-line {
+            display: flex;
+            align-items: center;
+            margin-top: 10px;
+        }
+
+        .terminal-input {
+            background: transparent;
+            border: none;
+            color: #ffffff;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            outline: none;
+            flex: 1;
+            padding: 5px;
+        }
+
+        .terminal-input:focus {
+            outline: none;
+        }
+
+        .logo {
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 24px;
+            font-weight: bold;
+            color: #00ff00;
+            text-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
+        }
+
+        .subtitle {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #00ff00;
+            opacity: 0.6;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="terminal">
+        <div class="terminal-header">
+            <div class="logo">TOP TURF</div>
+            <div class="subtitle">Secure Login Terminal v2.0</div>
+        </div>
+        
+        <div class="terminal-content" id="terminalContent">
+            <div class="output">Initializing Top Turf Security System...</div>
+            <div class="output">Authentication required. Please enter credentials.</div>
+            <div class="output">Type 'help' for available commands.</div>
+            <div class="command-line">
+                <span class="prompt">user@topturf:~$</span>
+                <span class="command"></span>
+                <span class="cursor"></span>
+            </div>
+        </div>
+        
+        <div class="input-line">
+            <input type="text" class="terminal-input" id="terminalInput" placeholder="Enter command..." autofocus>
+        </div>
+    </div>
+
+    <script>
+        const terminalContent = document.getElementById('terminalContent');
+        const terminalInput = document.getElementById('terminalInput');
+        let commandHistory = [];
+        let historyIndex = -1;
+
+        // Simulated user database
+        const users = {
+            'admin': { password: '123456', name: 'Administrator', location: 'All Locations' },
+            'bob': { password: 'password', name: 'Bob Smith', location: 'Top Turf South Carolina' },
+            'thomas': { password: 'password', name: 'Thomas Wilson', location: 'Top Turf Georgia' },
+            'john': { password: 'password', name: 'John Keller', location: 'Top Turf Keller Texas' }
+        };
+
+        function addOutput(text, className = 'output') {
+            const outputDiv = document.createElement('div');
+            outputDiv.className = className;
+            outputDiv.textContent = text;
+            terminalContent.appendChild(outputDiv);
+            terminalContent.scrollTop = terminalContent.scrollHeight;
+        }
+
+        function updatePrompt() {
+            const promptSpan = document.querySelector('.prompt');
+            if (promptSpan) {
+                const currentUser = getCurrentUser();
+                if (currentUser) {
+                    promptSpan.textContent = `${currentUser}@topturf:~$`;
+                } else {
+                    promptSpan.textContent = 'user@topturf:~$';
+                }
+            }
+        }
+
+        function getCurrentUser() {
+            const sessionUser = sessionStorage.getItem('currentUser');
+            return sessionUser;
+        }
+
+        function setCurrentUser(username) {
+            sessionStorage.setItem('currentUser', username);
+            updatePrompt();
+            addOutput(`User authenticated: ${username}`, 'success');
+            addOutput(`Welcome to Top Turf Management System`, 'success');
+            
+            // Redirect to main dashboard after successful login
+            setTimeout(() => {
+                window.location.href = '/owner.html';
+            }, 2000);
+        }
+
+        function processCommand(command) {
+            const trimmedCommand = command.trim().toLowerCase();
+            
+            // Add command to history
+            commandHistory.push(command);
+            historyIndex = commandHistory.length;
+            
+            // Display the command
+            const commandLine = document.querySelector('.command');
+            if (commandLine) {
+                commandLine.textContent = command;
+            }
+
+            if (trimmedCommand === 'help') {
+                addOutput('Available commands:', 'output');
+                addOutput('  login <username> <password> - Login to system', 'output');
+                addOutput('  users - List available users', 'output');
+                addOutput('  clear - Clear terminal', 'output');
+                addOutput('  exit - Exit terminal', 'output');
+                addOutput('  whoami - Show current user', 'output');
+            } else if (trimmedCommand === 'users') {
+                addOutput('Available users:', 'output');
+                Object.keys(users).forEach(username => {
+                    const user = users[username];
+                    addOutput(`  ${username} - ${user.name} (${user.location})`, 'output');
+                });
+            } else if (trimmedCommand === 'clear') {
+                terminalContent.innerHTML = '';
+                addOutput('Terminal cleared.', 'output');
+            } else if (trimmedCommand === 'whoami') {
+                const currentUser = getCurrentUser();
+                if (currentUser) {
+                    addOutput(`Current user: ${currentUser}`, 'output');
+                } else {
+                    addOutput('No user currently logged in.', 'error');
+                }
+            } else if (trimmedCommand === 'exit') {
+                addOutput('Goodbye!', 'output');
+                setTimeout(() => {
+                    window.location.href = 'about:blank';
+                }, 1000);
+            } else if (trimmedCommand.startsWith('login ')) {
+                const parts = trimmedCommand.split(' ');
+                if (parts.length === 3) {
+                    const username = parts[1];
+                    const password = parts[2];
+                    
+                    if (users[username] && users[username].password === password) {
+                        setCurrentUser(username);
+                    } else {
+                        addOutput('Authentication failed. Invalid username or password.', 'error');
+                    }
+                } else {
+                    addOutput('Usage: login <username> <password>', 'error');
+                }
+            } else if (trimmedCommand === '') {
+                // Empty command, just show new prompt
+                return;
+            } else {
+                addOutput(`Command not found: ${trimmedCommand}. Type 'help' for available commands.`, 'error');
+            }
+        }
+
+        // Handle keyboard input
+        terminalInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                const command = terminalInput.value;
+                addOutput(`user@topturf:~$ ${command}`, 'output');
+                processCommand(command);
+                terminalInput.value = '';
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                if (historyIndex > 0) {
+                    historyIndex--;
+                    terminalInput.value = commandHistory[historyIndex];
+                }
+            } else if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                if (historyIndex < commandHistory.length - 1) {
+                    historyIndex++;
+                    terminalInput.value = commandHistory[historyIndex];
+                }
+            }
+        });
+
+        // Initial setup
+        updatePrompt();
+        terminalInput.focus();
+        
+        // Add some initial terminal animation
+        setTimeout(() => {
+            addOutput('System ready.', 'success');
+        }, 1000);
+    </script>
+</body>
+</html>
