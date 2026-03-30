@@ -1354,13 +1354,19 @@ def get_customers(request: Request):
         # Get location-specific service frequency by counting rounds from treatment_plans
         rounds_count = get_rounds_count_for_location(location_id)
         
-        if rounds_count == 0:
+        # Initialize days_between_service (will be 0 if no rounds configured)
+        days_between_service = round(365 / rounds_count) if rounds_count > 0 else 0
+        
+        # NEW SALES: Always due immediately on signup (no last_service_date)
+        if last_service_date is None:
+            is_due = True
+            status = "due"
+        elif rounds_count == 0:
             # No rounds configured - customer shows as not_due with a note
             is_due = False
             status = "no_rounds_configured"
         else:
-            days_between_service = round(365 / rounds_count)
-            is_due = (last_service_date is None) or (days_since >= days_between_service)
+            is_due = days_since >= days_between_service
             status = "due" if is_due else "not_due"
 
         customers_with_status.append(
