@@ -10,6 +10,7 @@ import requests
 import json
 import math
 from typing import List, Dict, Tuple, Optional
+from cryptography.fernet import Fernet
 
 # Your Geocodio API key
 GEOCODIO_API_KEY = "04f1debf16fbfbffbe9fa41ba4ef969fae61ddb"
@@ -17,6 +18,42 @@ GEOCODIO_API_KEY = "04f1debf16fbfbffbe9fa41ba4ef969fae61ddb"
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_FILE = os.path.join(BASE_DIR, "database.db")
 STATIC_DIR = os.path.join(BASE_DIR, "static")
+
+# ========== Encryption Setup for Secret Keys ==========
+MASTER_KEY_FILE = os.path.join(BASE_DIR, '.master_key')
+
+def get_or_create_master_key():
+    """Get existing master key or create new one for this deployment"""
+    if os.path.exists(MASTER_KEY_FILE):
+        with open(MASTER_KEY_FILE, 'rb') as f:
+            return f.read()
+    else:
+        # Generate new key for this deployment
+        key = Fernet.generate_key()
+        with open(MASTER_KEY_FILE, 'wb') as f:
+            f.write(key)
+        print(f"Generated new master encryption key for this deployment")
+        return key
+
+# Initialize encryption
+master_key = get_or_create_master_key()
+cipher_suite = Fernet(master_key)
+
+def encrypt_secret(secret: str) -> str:
+    """Encrypt a secret string before storing in database"""
+    if not secret:
+        return None
+    return cipher_suite.encrypt(secret.encode()).decode()
+
+def decrypt_secret(encrypted: str) -> str:
+    """Decrypt an encrypted secret from database"""
+    if not encrypted:
+        return None
+    try:
+        return cipher_suite.decrypt(encrypted.encode()).decode()
+    except Exception as e:
+        print(f"Decryption failed: {e}")
+        return None
 
 
 # ========== Geocodio Helper ==========
@@ -51,7 +88,7 @@ def geocode_geocodio(address):
     return None, None
 
 
-# Database setup - SAFE notes column addition
+# Database setup
 conn = sqlite3.connect(DB_FILE, check_same_thread=False)
 cursor = conn.cursor()
 
@@ -154,6 +191,19 @@ CREATE TABLE IF NOT EXISTS technician_territories (
 )
 """)
 
+# Technician service assignments (which services each technician can perform)
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS technician_services (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    technician_id INTEGER NOT NULL,
+    service_id INTEGER NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (technician_id) REFERENCES technicians (id) ON DELETE CASCADE,
+    FOREIGN KEY (service_id) REFERENCES services (id) ON DELETE CASCADE,
+    UNIQUE(technician_id, service_id)
+)
+""")
+
 # 🧠 SAAS ROUTE OPTIMIZATION TABLES
 # Service schedule table for predictive scheduling
 cursor.execute("""
@@ -216,6 +266,13 @@ except sqlite3.OperationalError:
     pass
 
 conn.commit()
+
+def get_db():
+    """Get a local database connection to avoid recursive cursor issues"""
+    local_conn = sqlite3.connect(DB_FILE)
+    local_conn.row_factory = sqlite3.Row
+    return local_conn
+
 
 # 🧠 SAAS ROUTE OPTIMIZATION ENGINE
 def calculate_distance(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
@@ -307,25 +364,31 @@ def optimize_route_greedy(customers: List[Dict]) -> List[Dict]:
 def get_rounds_count_for_location(location_id: int) -> int:
     """Count the number of treatment rounds for a location from treatment_plans"""
     try:
+        # Use local connection to avoid recursive cursor issues
+        local_conn = sqlite3.connect('database.db')
+        local_cursor = local_conn.cursor()
+        
         # Get the first treatment plan for this location and count its treatments
-        cursor.execute(
+        local_cursor.execute(
             "SELECT id FROM treatment_plans WHERE location_id = ? LIMIT 1",
             (location_id,)
         )
-        plan = cursor.fetchone()
+        plan = local_cursor.fetchone()
         
         if not plan:
+            local_conn.close()
             return 0  # No treatment plans exist for this location
         
         plan_id = plan[0]
         
         # Count treatments for this plan
-        cursor.execute(
+        local_cursor.execute(
             "SELECT COUNT(*) FROM treatments WHERE plan_id = ?",
             (plan_id,)
         )
-        count = cursor.fetchone()[0]
+        count = local_cursor.fetchone()[0]
         
+        local_conn.close()
         return count
     except Exception as e:
         print(f"Error counting rounds for location {location_id}: {e}")
@@ -559,6 +622,14 @@ CREATE TABLE IF NOT EXISTS chemical_autos (
 """)
 
 cursor.execute("""
+CREATE TABLE IF NOT EXISTS mowing_services (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    service_name TEXT NOT NULL UNIQUE,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+)
+""")
+
+cursor.execute("""
 CREATE TABLE IF NOT EXISTS locations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL UNIQUE,
@@ -606,6 +677,107 @@ CREATE TABLE IF NOT EXISTS office_workers (
     FOREIGN KEY (location_id) REFERENCES locations (id) ON DELETE CASCADE
 )
 """)
+
+# █████ MULTI-SERVICE ARCHITECTURE TABLES
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS services (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    service_type TEXT NOT NULL,  -- 'chemical', 'pest', 'mowing', 'fertilization', 'weed_control'
+    location_id INTEGER NOT NULL,
+    config_json TEXT DEFAULT '{}',  -- Service-specific configuration (JSON)
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (location_id) REFERENCES locations (id) ON DELETE CASCADE
+)
+""")
+
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS customer_services (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    customer_id INTEGER NOT NULL,
+    service_id INTEGER NOT NULL,
+    price REAL DEFAULT 0,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (customer_id) REFERENCES customers (id) ON DELETE CASCADE,
+    FOREIGN KEY (service_id) REFERENCES services (id) ON DELETE CASCADE,
+    UNIQUE(customer_id, service_id)
+)
+""")
+
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS payment_processors (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    processor_type TEXT NOT NULL UNIQUE,
+    is_enabled BOOLEAN DEFAULT FALSE,
+    config_json TEXT DEFAULT '{}',
+    secret_key_encrypted TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+)
+""")
+
+# Migration: Fix payment_processors table if it has old schema with location_id
+try:
+    # Check if location_id column exists
+    cursor.execute("PRAGMA table_info(payment_processors)")
+    columns = cursor.fetchall()
+    column_names = [col[1] for col in columns]
+    
+    if 'location_id' in column_names:
+        # Old schema detected - need to migrate
+        print("Migrating payment_processors table to new schema...")
+        
+        # Backup existing data
+        cursor.execute("SELECT id, processor_type, is_enabled, config_json, secret_key_hash FROM payment_processors")
+        existing_data = cursor.fetchall()
+        
+        # Drop and recreate table
+        cursor.execute("DROP TABLE payment_processors")
+        cursor.execute("""
+            CREATE TABLE payment_processors (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                processor_type TEXT NOT NULL UNIQUE,
+                is_enabled BOOLEAN DEFAULT FALSE,
+                config_json TEXT DEFAULT '{}',
+                secret_key_encrypted TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        # Restore data (only unique processor types)
+        seen_types = set()
+        for row in existing_data:
+            proc_type = row[1]
+            if proc_type and proc_type not in seen_types:
+                seen_types.add(proc_type)
+                cursor.execute("""
+                    INSERT INTO payment_processors (processor_type, is_enabled, config_json, secret_key_encrypted)
+                    VALUES (?, ?, ?, ?)
+                """, (row[1], row[2], row[3], row[4]))
+        
+        conn.commit()
+        print("Migration complete.")
+except Exception as e:
+    print(f"Migration note: {e}")
+
+# Migrate existing treatment_plans to services table as 'chemical' type
+try:
+    cursor.execute("""
+        INSERT OR IGNORE INTO services (name, service_type, location_id, config_json)
+        SELECT 
+            grass_type_name,
+            'chemical',
+            COALESCE(location_id, 1),
+            json_object('migrated_from', 'treatment_plans', 'grass_type', grass_type_name)
+        FROM treatment_plans
+        WHERE grass_type_name NOT IN (SELECT name FROM services WHERE service_type = 'chemical')
+    """)
+    conn.commit()
+except Exception as e:
+    print(f"Migration note: {e}")
 
 conn.commit()
 
@@ -680,6 +852,51 @@ try:
     conn.commit()
 except sqlite3.OperationalError:
     pass
+
+# ADD service_type column to technician_territories table for multi-service territory support
+try:
+    cursor.execute("ALTER TABLE technician_territories ADD COLUMN service_type TEXT DEFAULT 'chemical'")
+    conn.commit()
+except sqlite3.OperationalError:
+    pass
+
+# ADD stripe_payment_method_id column to customers table for saved payment methods
+try:
+    cursor.execute("ALTER TABLE customers ADD COLUMN stripe_payment_method_id TEXT")
+    conn.commit()
+except sqlite3.OperationalError:
+    pass
+
+# ADD stripe_customer_id column to customers table for Stripe Customer objects
+try:
+    cursor.execute("ALTER TABLE customers ADD COLUMN stripe_customer_id TEXT")
+    conn.commit()
+except sqlite3.OperationalError:
+    pass
+
+# ADD last_completed_date to customer_services for per-service tracking
+try:
+    cursor.execute("ALTER TABLE customer_services ADD COLUMN last_completed_date TEXT")
+    conn.commit()
+except sqlite3.OperationalError:
+    pass
+
+# Payments table for storing transaction history
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS payments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    customer_id INTEGER NOT NULL,
+    amount REAL NOT NULL,
+    processor_type TEXT NOT NULL,
+    processor_tx_id TEXT,
+    status TEXT DEFAULT 'pending',
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE
+)
+""")
+
+conn.commit()
 
 app = FastAPI()
 
@@ -1287,11 +1504,12 @@ def get_customers(request: Request):
                     c.measurement_data,
                     c.location_id,
                     c.grass_type_id,
-                    COALESCE(tp.grass_type_name, '')
+                    COALESCE(tp.grass_type_name, ''),
+                    c.stripe_payment_method_id
                 FROM customers c
                 LEFT JOIN treatment_plans tp ON c.grass_type_id = tp.id
                 WHERE c.location_id = ? OR c.location_id IS NULL
-                ORDER BY CASE WHEN c.last_service_date IS NULL THEN 0 ELSE 1 END, c.last_service_date ASC
+                ORDER BY c.rowid DESC
             """, (location_id,))
         else:
             # Admin sees all customers
@@ -1312,10 +1530,11 @@ def get_customers(request: Request):
                     c.measurement_data,
                     c.location_id,
                     c.grass_type_id,
-                    COALESCE(tp.grass_type_name, '')
+                    COALESCE(tp.grass_type_name, ''),
+                    c.stripe_payment_method_id
                 FROM customers c
                 LEFT JOIN treatment_plans tp ON c.grass_type_id = tp.id
-                ORDER BY CASE WHEN c.last_service_date IS NULL THEN 0 ELSE 1 END, c.last_service_date ASC
+                ORDER BY c.rowid DESC
             """)
         rows = cursor.fetchall()
     except Exception as e:
@@ -1342,7 +1561,8 @@ def get_customers(request: Request):
             measurement_data,
             location_id,
             grass_type_id,
-            grass_type_name
+            grass_type_name,
+            stripe_payment_method_id
         ) = row
 
         if last_service_date:
@@ -1357,16 +1577,54 @@ def get_customers(request: Request):
         # Initialize days_between_service (will be 0 if no rounds configured)
         days_between_service = round(365 / rounds_count) if rounds_count > 0 else 0
         
-        # NEW SALES: Always due immediately on signup (no last_service_date)
-        if last_service_date is None:
+        # Calculate status based on individual services, not just overall last_service_date
+        # Check if ANY active service is due
+        is_due = False
+        status = "not_due"
+        
+        # Get all active services for this customer
+        inner_cursor = conn.cursor()
+        inner_cursor.execute("""
+            SELECT cs.service_id, cs.last_completed_date, s.service_type
+            FROM customer_services cs
+            JOIN services s ON cs.service_id = s.id
+            WHERE cs.customer_id = ? AND cs.is_active = 1
+        """, (rowid,))
+        active_services = inner_cursor.fetchall()
+        
+        if not active_services:
+            # No active services - mark as due to encourage assignment
             is_due = True
             status = "due"
-        elif rounds_count == 0:
-            # No rounds configured - customer shows as not_due with a note
-            is_due = False
-            status = "no_rounds_configured"
         else:
-            is_due = days_since >= days_between_service
+            for svc in active_services:
+                svc_id, last_completed, svc_type = svc
+                svc_frequency = 45  # default 45 days
+                
+                # Get frequency from service config if available
+                inner_cursor.execute("SELECT config_json FROM services WHERE id = ?", (svc_id,))
+                config_row = inner_cursor.fetchone()
+                if config_row and config_row[0]:
+                    try:
+                        import json
+                        cfg = json.loads(config_row[0])
+                        if cfg.get('frequency_days'):
+                            svc_frequency = int(cfg['frequency_days'])
+                    except:
+                        pass
+                
+                # Check if this specific service is due
+                if last_completed:
+                    completed_date = datetime.fromisoformat(last_completed).date()
+                    next_due = completed_date + timedelta(days=svc_frequency)
+                    if now >= next_due:
+                        is_due = True
+                        break
+                else:
+                    # Never completed = due
+                    is_due = True
+                    break
+            
             status = "due" if is_due else "not_due"
 
         customers_with_status.append(
@@ -1389,7 +1647,8 @@ def get_customers(request: Request):
                 grass_type_id,
                 grass_type_name,
                 days_between_service if rounds_count > 0 else 0,  # [17] days between
-                (datetime.fromisoformat(last_service_date).date() + timedelta(days=days_between_service)).isoformat() if last_service_date and rounds_count > 0 else None  # [18] next due date
+                (datetime.fromisoformat(last_service_date).date() + timedelta(days=days_between_service)).isoformat() if last_service_date and rounds_count > 0 else None,  # [18] next due date
+                stripe_payment_method_id  # [19] payment method saved indicator
             )
         )
 
@@ -1419,27 +1678,38 @@ def add_customer(
     # Get the office worker's location_id
     location_id = request.session.get('location_id')
 
+    # Use local connection
+    local_conn = get_db()
+    local_cursor = local_conn.cursor()
+    
     # Insert customer with location_id
-    cursor.execute("""
+    local_cursor.execute("""
         INSERT INTO customers
             (name, address, phone, sqft, monthly_min, monthly_max, notes, last_service_date, lat, lng, location_id)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (name, address, phone, sqft, monthly_min, monthly_max, notes, None, lat, lng, location_id))
-    conn.commit()
-    new_rowid = cursor.lastrowid
+    local_conn.commit()
+    new_rowid = local_cursor.lastrowid
+    local_conn.close()
     return {"status": "success", "name": name, "rowid": new_rowid}
 
 
 @app.post("/update_notes")
 def update_notes(rowid: int = Form(...), notes: str = Form(...)):
-    cursor.execute("UPDATE customers SET notes = ? WHERE rowid = ?", (notes, rowid))
-    conn.commit()
+    local_conn = get_db()
+    local_cursor = local_conn.cursor()
+    local_cursor.execute("UPDATE customers SET notes = ? WHERE rowid = ?", (notes, rowid))
+    local_conn.commit()
+    local_conn.close()
     return {"status": "success"}
 
 @app.post("/update_actual_price")
 def update_actual_price(rowid: int = Form(...), actual_price: float = Form(...)):
-    cursor.execute("UPDATE customers SET actual_price = ? WHERE rowid = ?", (actual_price, rowid))
-    conn.commit()
+    local_conn = get_db()
+    local_cursor = local_conn.cursor()
+    local_cursor.execute("UPDATE customers SET actual_price = ? WHERE rowid = ?", (actual_price, rowid))
+    local_conn.commit()
+    local_conn.close()
     return {"status": "success"}
 
 
@@ -1450,9 +1720,14 @@ def update_grass_type(rowid: int = Form(...), grass_type_id: str = Form(...)):
         # Convert empty string to None (NULL in database)
         grass_type_id_value = int(grass_type_id) if grass_type_id and grass_type_id.strip() else None
         
-        cursor.execute("UPDATE customers SET grass_type_id = ? WHERE rowid = ?", (grass_type_id_value, rowid))
-        conn.commit()
-        if cursor.rowcount > 0:
+        local_conn = get_db()
+        local_cursor = local_conn.cursor()
+        local_cursor.execute("UPDATE customers SET grass_type_id = ? WHERE rowid = ?", (grass_type_id_value, rowid))
+        local_conn.commit()
+        success = local_cursor.rowcount > 0
+        local_conn.close()
+        
+        if success:
             return {"status": "success", "message": "Grass type updated"}
         else:
             return {"status": "error", "message": "Customer not found"}
@@ -1462,45 +1737,227 @@ def update_grass_type(rowid: int = Form(...), grass_type_id: str = Form(...)):
 
 @app.post("/delete_customer")
 def delete_customer(rowid: int = Form(...)):
-    cursor.execute("DELETE FROM customers WHERE rowid = ?", (rowid,))
-    conn.commit()
-    if cursor.rowcount > 0:
+    local_conn = get_db()
+    local_cursor = local_conn.cursor()
+    local_cursor.execute("DELETE FROM customers WHERE rowid = ?", (rowid,))
+    local_conn.commit()
+    success = local_cursor.rowcount > 0
+    local_conn.close()
+    
+    if success:
         return {"status": "success"}
     else:
         return {"status": "error", "message": "Customer not found"}
 
 
 @app.post("/mark_service")
-def mark_service(rowid: int = Form(...)):
-    # When you actually go to the property, record the service date
-    # Then the 45‑day timer starts from THAT date
-    cursor.execute("UPDATE customers SET last_service_date = date('now') WHERE rowid = ?", (rowid,))
-    conn.commit()
-    return {"status": "success"}
+def mark_service(rowid: int = Form(...), service_id: int = Form(None)):
+    """Mark service as complete and auto-charge customer if payment method is saved"""
+    try:
+        local_conn = get_db()
+        local_cursor = local_conn.cursor()
+        
+        # Get customer details including payment method and stripe customer id
+        local_cursor.execute("""
+            SELECT c.name, c.stripe_payment_method_id, c.stripe_customer_id
+            FROM customers c
+            WHERE c.rowid = ?
+        """, (rowid,))
+        customer = local_cursor.fetchone()
+        
+        if not customer:
+            local_conn.close()
+            return {"status": "error", "message": "Customer not found"}
+        
+        name, payment_method_id, stripe_customer_id = customer
+        
+        # If specific service_id provided, update that service's last_completed_date
+        if service_id:
+            # Get the service details and price
+            local_cursor.execute("""
+                SELECT s.name, s.service_type, cs.price, s.config_json
+                FROM customer_services cs
+                JOIN services s ON cs.service_id = s.id
+                WHERE cs.customer_id = ? AND cs.service_id = ?
+            """, (rowid, service_id))
+            service = local_cursor.fetchone()
+            
+            if not service:
+                local_conn.close()
+                return {"status": "error", "message": "Service assignment not found"}
+            
+            service_name, service_type, price, config_json = service
+            amount = price or 0
+            
+            # Update last_completed_date for this specific service
+            local_cursor.execute("""
+                UPDATE customer_services 
+                SET last_completed_date = date('now') 
+                WHERE customer_id = ? AND service_id = ?
+            """, (rowid, service_id))
+            local_conn.commit()
+            
+            # Also update customer's overall last_service_date
+            local_cursor.execute("""
+                UPDATE customers 
+                SET last_service_date = date('now') 
+                WHERE rowid = ?
+            """, (rowid,))
+            local_conn.commit()
+            
+        else:
+            # Fallback: get first active service price if no service_id specified
+            local_cursor.execute("""
+                SELECT cs.price FROM customer_services cs
+                WHERE cs.customer_id = ? AND cs.is_active = 1
+                LIMIT 1
+            """, (rowid,))
+            row = local_cursor.fetchone()
+            amount = row[0] if row else 0
+            service_name = "Service"
+            
+            # Update customer's last_service_date
+            local_cursor.execute("""
+                UPDATE customers 
+                SET last_service_date = date('now') 
+                WHERE rowid = ?
+            """, (rowid,))
+            local_conn.commit()
+        
+        # Auto-charge if payment method exists and amount > 0
+        charge_result = None
+        if payment_method_id and amount > 0:
+            # Check if service is actually due before charging
+            service_is_due = False
+            if service_id:
+                # Check the specific service's last_completed_date
+                check_cursor = local_conn.cursor()
+                check_cursor.execute("""
+                    SELECT cs.last_completed_date, s.config_json
+                    FROM customer_services cs
+                    JOIN services s ON cs.service_id = s.id
+                    WHERE cs.customer_id = ? AND cs.service_id = ?
+                """, (rowid, service_id))
+                svc_row = check_cursor.fetchone()
+                if svc_row:
+                    last_completed, config_json = svc_row
+                    if not last_completed:
+                        service_is_due = True  # Never completed = due
+                    else:
+                        from datetime import datetime, timedelta
+                        frequency = 45  # default
+                        if config_json:
+                            try:
+                                import json
+                                cfg = json.loads(config_json)
+                                if cfg.get('frequency_days'):
+                                    frequency = int(cfg['frequency_days'])
+                            except:
+                                pass
+                        completed_date = datetime.fromisoformat(last_completed).date()
+                        next_due = completed_date + timedelta(days=frequency)
+                        today = datetime.now().date()
+                        service_is_due = today >= next_due
+            
+            if not service_is_due:
+                charge_result = {
+                    "status": "skipped",
+                    "error": "Service not due yet - cannot charge"
+                }
+            else:
+                try:
+                    import stripe
+                    
+                    # Get Stripe config
+                    cursor.execute("""
+                        SELECT secret_key_encrypted, config_json FROM payment_processors 
+                        WHERE processor_type = 'stripe' AND is_enabled = 1
+                    """)
+                    stripe_config = cursor.fetchone()
+                    
+                    if stripe_config:
+                        secret_key = decrypt_secret(stripe_config[0]) if stripe_config[0] else None
+                        if secret_key:
+                            stripe.api_key = secret_key
+                            
+                            # Create charge using saved payment method with customer
+                            charge = stripe.PaymentIntent.create(
+                                amount=int(amount * 100),  # Convert to cents
+                                currency='usd',
+                                customer=stripe_customer_id,
+                                payment_method=payment_method_id,
+                                confirm=True,
+                                description=f"{service_name} - {name}",
+                                automatic_payment_methods={
+                                    'enabled': True,
+                                    'allow_redirects': 'never'
+                                },
+                                metadata={
+                                    'customer_id': rowid,
+                                    'customer_name': name,
+                                    'service_name': service_name,
+                                    'service_type': 'auto_charge_on_completion'
+                                }
+                            )
+                            
+                            # Record payment in database
+                            cursor.execute("""
+                                INSERT INTO payments (customer_id, amount, processor_type, processor_tx_id, status, description)
+                                VALUES (?, ?, 'stripe', ?, 'completed', ?)
+                            """, (rowid, amount, charge.id, f"Auto-charge for {service_name}"))
+                            conn.commit()
+                            
+                            charge_result = {
+                                "status": "success",
+                                "amount": amount,
+                                "transaction_id": charge.id,
+                                "service": service_name
+                            }
+                except Exception as e:
+                    print(f"Auto-charge failed for customer {rowid}: {e}")
+                    charge_result = {
+                        "status": "failed",
+                        "error": str(e)
+                    }
+        
+        local_conn.close()
+        
+        return {
+            "status": "success",
+            "message": f"{service_name} marked complete",
+            "charge": charge_result
+        }
+        
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
 
 @app.post("/save_measurement")
 def save_measurement(rowid: int = Form(...), measurement_data: str = Form(...), sqft: int = Form(None), monthly_min: float = Form(None), monthly_max: float = Form(None)):
     """Save property measurement polygon for a customer and update sqft/price if no actual price set"""
     try:
-        cursor.execute("UPDATE customers SET measurement_data = ? WHERE rowid = ?", (measurement_data, rowid))
+        local_conn = get_db()
+        local_cursor = local_conn.cursor()
+        
+        local_cursor.execute("UPDATE customers SET measurement_data = ? WHERE rowid = ?", (measurement_data, rowid))
         
         # Also update sqft if measurement provides it
         if sqft is not None and sqft > 0:
-            cursor.execute("UPDATE customers SET sqft = ? WHERE rowid = ?", (sqft, rowid))
+            local_cursor.execute("UPDATE customers SET sqft = ? WHERE rowid = ?", (sqft, rowid))
         
         # Only update price range if no actual_price is set
-        cursor.execute("SELECT actual_price FROM customers WHERE rowid = ?", (rowid,))
-        row = cursor.fetchone()
+        local_cursor.execute("SELECT actual_price FROM customers WHERE rowid = ?", (rowid,))
+        row = local_cursor.fetchone()
         actual_price = row[0] if row else None
         
         if actual_price is None or actual_price == 0:
             if monthly_min is not None and monthly_min > 0:
-                cursor.execute("UPDATE customers SET monthly_min = ? WHERE rowid = ?", (monthly_min, rowid))
+                local_cursor.execute("UPDATE customers SET monthly_min = ? WHERE rowid = ?", (monthly_min, rowid))
             if monthly_max is not None and monthly_max > 0:
-                cursor.execute("UPDATE customers SET monthly_max = ? WHERE rowid = ?", (monthly_max, rowid))
+                local_cursor.execute("UPDATE customers SET monthly_max = ? WHERE rowid = ?", (monthly_max, rowid))
         
-        conn.commit()
+        local_conn.commit()
+        local_conn.close()
         return {"status": "success", "message": "Measurement saved"}
     except Exception as e:
         return {"status": "error", "message": str(e)}
@@ -1508,21 +1965,24 @@ def save_measurement(rowid: int = Form(...), measurement_data: str = Form(...), 
 
 @app.get("/geocode_missing")
 def geocode_missing():
-    cursor.execute("SELECT rowid, address FROM customers WHERE lat IS NULL OR lng IS NULL")
-    rows = cursor.fetchall()
+    local_conn = get_db()
+    local_cursor = local_conn.cursor()
+    local_cursor.execute("SELECT rowid, address FROM customers WHERE lat IS NULL OR lng IS NULL")
+    rows = local_cursor.fetchall()
     count = 0
     for rowid, address in rows:
         # Use full address
         full = f"{address}, Texas, United States"
         lat, lng = geocode_geocodio(full)
         if lat is not None and lng is not None:
-            cursor.execute(
+            local_cursor.execute(
                 "UPDATE customers SET lat = ?, lng = ?, address = ? WHERE rowid = ?",
                 (lat, lng, full, rowid)
             )
-            conn.commit()
+            local_conn.commit()
             print(f"Updated {full} -> {lat}, {lng}")
             count += 1
+    local_conn.close()
     return {"status": "geocoded", "updated": count}
 
 
@@ -1531,26 +1991,30 @@ def geocode_missing():
 @app.get("/treatment-plans")
 def get_treatment_plans(location_id: int = None):
     """Fetch treatment plans with their treatments, chemicals, and notes - filtered by location"""
+    # Use local connection to avoid recursive cursor issues
+    local_conn = sqlite3.connect('database.db')
+    local_cursor = local_conn.cursor()
+    
     if location_id:
-        cursor.execute(
+        local_cursor.execute(
             "SELECT id, grass_type_name FROM treatment_plans WHERE location_id = ? ORDER BY grass_type_name",
             (location_id,)
         )
     else:
         # If no location specified, return empty (all plans must have a location)
-        cursor.execute("SELECT id, grass_type_name FROM treatment_plans WHERE 1=0")
+        local_cursor.execute("SELECT id, grass_type_name FROM treatment_plans WHERE 1=0")
     
-    plans = cursor.fetchall()
+    plans = local_cursor.fetchall()
     
     result = []
     for plan_id, grass_type_name in plans:
-        cursor.execute("""
+        local_cursor.execute("""
             SELECT id, treatment_order, chemicals, notes 
             FROM treatments 
             WHERE plan_id = ? 
             ORDER BY treatment_order ASC
         """, (plan_id,))
-        treatments = cursor.fetchall()
+        treatments = local_cursor.fetchall()
         
         treatment_list = []
         display_number = 1
@@ -1573,6 +2037,7 @@ def get_treatment_plans(location_id: int = None):
             "treatments": treatment_list
         })
     
+    local_conn.close()
     return {"grassTypes": result}
 
 
@@ -1608,16 +2073,23 @@ def get_treatments_for_plan(plan_id: int):
 
 @app.get("/global-data")
 def get_global_data():
-    """Fetch condition codes and chemical autos with their IDs"""
-    cursor.execute("SELECT id, code_name FROM condition_codes ORDER BY code_name")
-    codes = [{"id": row[0], "name": row[1]} for row in cursor.fetchall()]
+    """Fetch condition codes, chemical autos, and mowing services with their IDs"""
+    local_conn = get_db()
+    local_cursor = local_conn.cursor()
+    local_cursor.execute("SELECT id, code_name FROM condition_codes ORDER BY code_name")
+    codes = [{"id": row[0], "name": row[1]} for row in local_cursor.fetchall()]
     
-    cursor.execute("SELECT id, chemical_name FROM chemical_autos ORDER BY chemical_name")
-    chems = [{"id": row[0], "name": row[1]} for row in cursor.fetchall()]
+    local_cursor.execute("SELECT id, chemical_name FROM chemical_autos ORDER BY chemical_name")
+    chems = [{"id": row[0], "name": row[1]} for row in local_cursor.fetchall()]
+    
+    local_cursor.execute("SELECT id, service_name FROM mowing_services ORDER BY service_name")
+    mowing = [{"id": row[0], "name": row[1]} for row in local_cursor.fetchall()]
+    local_conn.close()
     
     return {
         "conditionCodes": codes,
-        "chemicalAutos": chems
+        "chemicalAutos": chems,
+        "mowingServices": mowing
     }
 
 
@@ -1627,27 +2099,40 @@ def create_treatment_plan(grass_type_name: str = Form(...), location_id: int = F
     if not location_id:
         return {"status": "error", "message": "Location is required for treatment plans"}
     
+    local_conn = get_db()
+    local_cursor = local_conn.cursor()
     try:
-        cursor.execute(
+        local_cursor.execute(
             "INSERT INTO treatment_plans (grass_type_name, location_id) VALUES (?, ?)",
             (grass_type_name, location_id)
         )
-        conn.commit()
-        plan_id = cursor.lastrowid
+        local_conn.commit()
+        plan_id = local_cursor.lastrowid
         return {"status": "success", "id": plan_id, "name": grass_type_name}
     except sqlite3.IntegrityError:
         return {"status": "error", "message": "Grass type already exists for this location"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+    finally:
+        local_conn.close()
 
 
 @app.delete("/treatment-plans/{plan_id}")
 def delete_treatment_plan(plan_id: int):
     """Delete a treatment plan (cascades to treatments)"""
-    cursor.execute("DELETE FROM treatment_plans WHERE id = ?", (plan_id,))
-    conn.commit()
-    if cursor.rowcount > 0:
-        return {"status": "success"}
-    else:
-        return {"status": "error", "message": "Plan not found"}
+    local_conn = get_db()
+    local_cursor = local_conn.cursor()
+    try:
+        local_cursor.execute("DELETE FROM treatment_plans WHERE id = ?", (plan_id,))
+        local_conn.commit()
+        if local_cursor.rowcount > 0:
+            return {"status": "success"}
+        else:
+            return {"status": "error", "message": "Plan not found"}
+    except sqlite3.OperationalError as e:
+        return {"status": "error", "message": f"Database error: {str(e)}"}
+    finally:
+        local_conn.close()
 
 
 @app.post("/treatments")
@@ -1819,6 +2304,368 @@ def delete_chemical_auto(chem_id: int):
         return {"status": "error", "message": "Chemical not found"}
 
 
+# =============== MOWING SERVICES ENDPOINTS ===============
+
+@app.get("/mowing-services")
+def get_mowing_services():
+    """Get all global mowing services"""
+    try:
+        local_conn = get_db()
+        local_cursor = local_conn.cursor()
+        local_cursor.execute(
+            "SELECT id, service_name, created_at FROM mowing_services ORDER BY service_name ASC"
+        )
+        rows = local_cursor.fetchall()
+        services = []
+        for row in rows:
+            services.append({
+                "id": row[0],
+                "service_name": row[1],
+                "created_at": row[2]
+            })
+        local_conn.close()
+        return {"status": "success", "mowingServices": services}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@app.post("/mowing-services")
+def add_mowing_service(service_name: str = Form(...)):
+    """Add a mowing service to global list"""
+    try:
+        local_conn = get_db()
+        local_cursor = local_conn.cursor()
+        local_cursor.execute(
+            "INSERT INTO mowing_services (service_name) VALUES (?)",
+            (service_name,)
+        )
+        local_conn.commit()
+        service_id = local_cursor.lastrowid
+        local_conn.close()
+        return {"status": "success", "id": service_id, "service_name": service_name}
+    except sqlite3.IntegrityError:
+        return {"status": "error", "message": "Mowing service already exists"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@app.delete("/mowing-services/{service_id}")
+def delete_mowing_service(service_id: int):
+    """Delete a mowing service from global list"""
+    try:
+        local_conn = get_db()
+        local_cursor = local_conn.cursor()
+        local_cursor.execute("DELETE FROM mowing_services WHERE id = ?", (service_id,))
+        local_conn.commit()
+        success = local_cursor.rowcount > 0
+        local_conn.close()
+        
+        if success:
+            return {"status": "success"}
+        else:
+            return {"status": "error", "message": "Mowing service not found"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+# =============== SERVICES ENDPOINTS ===============
+
+@app.get("/services")
+def get_services(location_id: int = None):
+    """Fetch all services, optionally filtered by location. Excludes grass types migrated from treatment_plans."""
+    try:
+        local_conn = get_db()
+        local_cursor = local_conn.cursor()
+        
+        # Only get services that were NOT migrated from treatment_plans (real services only)
+        if location_id:
+            local_cursor.execute(
+                """SELECT id, name, service_type, location_id, config_json, is_active 
+                   FROM services 
+                   WHERE location_id = ? AND is_active = 1 
+                   AND (config_json IS NULL OR config_json NOT LIKE '%migrated_from%treatment_plans%')
+                   ORDER BY name""",
+                (location_id,)
+            )
+        else:
+            local_cursor.execute(
+                """SELECT id, name, service_type, location_id, config_json, is_active 
+                   FROM services 
+                   WHERE is_active = 1 
+                   AND (config_json IS NULL OR config_json NOT LIKE '%migrated_from%treatment_plans%')
+                   ORDER BY name"""
+            )
+        
+        services = local_cursor.fetchall()
+        result = []
+        for s in services:
+            import json
+            result.append({
+                "id": s[0],
+                "name": s[1],
+                "service_type": s[2],
+                "location_id": s[3],
+                "config": json.loads(s[4]) if s[4] else {},
+                "is_active": s[5]
+            })
+        
+        local_conn.close()
+        return {"status": "success", "services": result}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@app.post("/services")
+def create_service(
+    name: str = Form(...),
+    service_type: str = Form(...),
+    location_id: int = Form(...),
+    config_json: str = Form('{}')
+):
+    """Create a new service"""
+    try:
+        local_conn = get_db()
+        local_cursor = local_conn.cursor()
+        local_cursor.execute(
+            "INSERT INTO services (name, service_type, location_id, config_json) VALUES (?, ?, ?, ?)",
+            (name, service_type, location_id, config_json)
+        )
+        local_conn.commit()
+        service_id = local_cursor.lastrowid
+        local_conn.close()
+        return {"status": "success", "id": service_id, "name": name}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@app.delete("/services/{service_id}")
+def delete_service(service_id: int):
+    """Soft delete a service (mark inactive)"""
+    try:
+        local_conn = get_db()
+        local_cursor = local_conn.cursor()
+        local_cursor.execute("UPDATE services SET is_active = 0 WHERE id = ?", (service_id,))
+        local_conn.commit()
+        success = local_cursor.rowcount > 0
+        local_conn.close()
+        
+        if success:
+            return {"status": "success"}
+        else:
+            return {"status": "error", "message": "Service not found"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@app.get("/customers/{customer_id}/services")
+def get_customer_services(customer_id: int):
+    """Get all services assigned to a customer with pricing"""
+    try:
+        local_conn = get_db()
+        local_cursor = local_conn.cursor()
+        local_cursor.execute("""
+            SELECT s.id, s.name, s.service_type, cs.price, cs.is_active, cs.last_completed_date
+            FROM customer_services cs
+            JOIN services s ON cs.service_id = s.id
+            WHERE cs.customer_id = ?
+            ORDER BY s.name
+        """, (customer_id,))
+        
+        services = local_cursor.fetchall()
+        result = []
+        for s in services:
+            result.append({
+                "id": s[0],
+                "name": s[1],
+                "service_type": s[2],
+                "price": s[3],
+                "is_active": s[4],
+                "last_completed_date": s[5]
+            })
+        
+        local_conn.close()
+        return {"status": "success", "services": result}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@app.post("/customers/{customer_id}/services")
+def assign_service_to_customer(
+    customer_id: int,
+    service_id: int = Form(...),
+    price: float = Form(0)
+):
+    """Assign a service to a customer with pricing"""
+    try:
+        local_conn = get_db()
+        local_cursor = local_conn.cursor()
+        local_cursor.execute(
+            "INSERT OR REPLACE INTO customer_services (customer_id, service_id, price, is_active) VALUES (?, ?, ?, 1)",
+            (customer_id, service_id, price)
+        )
+        local_conn.commit()
+        local_conn.close()
+        return {"status": "success"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@app.delete("/customers/{customer_id}/services/{service_id}")
+def remove_service_from_customer(customer_id: int, service_id: int):
+    """Remove a service from a customer"""
+    try:
+        local_conn = get_db()
+        local_cursor = local_conn.cursor()
+        local_cursor.execute(
+            "DELETE FROM customer_services WHERE customer_id = ? AND service_id = ?",
+            (customer_id, service_id)
+        )
+        local_conn.commit()
+        success = local_cursor.rowcount > 0
+        local_conn.close()
+        
+        if success:
+            return {"status": "success"}
+        else:
+            return {"status": "error", "message": "Service assignment not found"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@app.post("/customers/{customer_id}/services/{service_id}/price")
+def update_customer_service_price(
+    customer_id: int,
+    service_id: int,
+    price: float = Form(...)
+):
+    """Update the price for a customer's service"""
+    try:
+        local_conn = get_db()
+        local_cursor = local_conn.cursor()
+        local_cursor.execute(
+            "UPDATE customer_services SET price = ? WHERE customer_id = ? AND service_id = ?",
+            (price, customer_id, service_id)
+        )
+        local_conn.commit()
+        success = local_cursor.rowcount > 0
+        local_conn.close()
+        
+        if success:
+            return {"status": "success"}
+        else:
+            return {"status": "error", "message": "Service assignment not found"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+# =============== MOWING ROUNDS ENDPOINTS ===============
+
+# Create mowing_rounds table if not exists
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS mowing_rounds (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    location_id INTEGER NOT NULL,
+    round_number INTEGER NOT NULL,
+    notes TEXT DEFAULT '',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (location_id) REFERENCES locations (id) ON DELETE CASCADE
+)
+""")
+conn.commit()
+
+@app.get("/mowing-rounds")
+def get_mowing_rounds(location_id: int = None):
+    """Get all mowing rounds for a location"""
+    try:
+        local_conn = get_db()
+        local_cursor = local_conn.cursor()
+        
+        if location_id:
+            local_cursor.execute(
+                "SELECT id, location_id, round_number, notes, created_at FROM mowing_rounds WHERE location_id = ? ORDER BY round_number ASC",
+                (location_id,)
+            )
+        else:
+            local_cursor.execute(
+                "SELECT id, location_id, round_number, notes, created_at FROM mowing_rounds ORDER BY round_number ASC"
+            )
+        
+        rows = local_cursor.fetchall()
+        rounds = []
+        for row in rows:
+            rounds.append({
+                "id": row[0],
+                "location_id": row[1],
+                "round_number": row[2],
+                "notes": row[3] or "",
+                "created_at": row[4]
+            })
+        
+        local_conn.close()
+        return {"status": "success", "rounds": rounds}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@app.post("/mowing-rounds")
+def create_mowing_round(location_id: int = Form(...), round_number: int = Form(...), notes: str = Form(default="")):
+    """Create a new mowing round for a location"""
+    try:
+        local_conn = get_db()
+        local_cursor = local_conn.cursor()
+        local_cursor.execute(
+            "INSERT INTO mowing_rounds (location_id, round_number, notes) VALUES (?, ?, ?)",
+            (location_id, round_number, notes)
+        )
+        local_conn.commit()
+        round_id = local_cursor.lastrowid
+        local_conn.close()
+        return {"status": "success", "id": round_id, "message": "Mowing round added"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@app.put("/mowing-rounds/{round_id}")
+def update_mowing_round(round_id: int, notes: str = Form(...)):
+    """Update a mowing round (e.g., service details)"""
+    try:
+        local_conn = get_db()
+        local_cursor = local_conn.cursor()
+        local_cursor.execute(
+            "UPDATE mowing_rounds SET notes = ? WHERE id = ?",
+            (notes, round_id)
+        )
+        local_conn.commit()
+        success = local_cursor.rowcount > 0
+        local_conn.close()
+        
+        if success:
+            return {"status": "success", "message": "Mowing round updated"}
+        else:
+            return {"status": "error", "message": "Round not found"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@app.delete("/mowing-rounds/{round_id}")
+def delete_mowing_round(round_id: int):
+    """Delete a mowing round"""
+    try:
+        local_conn = get_db()
+        local_cursor = local_conn.cursor()
+        local_cursor.execute("DELETE FROM mowing_rounds WHERE id = ?", (round_id,))
+        local_conn.commit()
+        success = local_cursor.rowcount > 0
+        local_conn.close()
+        
+        if success:
+            return {"status": "success", "message": "Mowing round deleted"}
+        else:
+            return {"status": "error", "message": "Round not found"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
 # =============== FORCE SOME CUSTOMERS TO BE "due" ===============
 # Mark customer 1 as serviced 2 days ago → due
 cursor.execute("""
@@ -1843,14 +2690,17 @@ conn.commit()
 def get_technicians():
     """Get all technicians with their locations"""
     try:
-        cursor.execute("""
+        local_conn = get_db()
+        local_cursor = local_conn.cursor()
+        local_cursor.execute("""
             SELECT t.id, t.name, t.location_id, t.color_hex, t.is_active, 
                    l.name as location_name, l.address as location_address
             FROM technicians t
             JOIN locations l ON t.location_id = l.id
             ORDER BY t.is_active DESC, t.name
         """)
-        technicians = cursor.fetchall()
+        technicians = local_cursor.fetchall()
+        local_conn.close()
         
         result = []
         for tech in technicians:
@@ -1872,13 +2722,17 @@ def get_technicians():
 def add_technician(name: str = Form(...), location_id: int = Form(...), color_hex: str = Form("#3b82f6")):
     """Add a new technician"""
     try:
-        cursor.execute("""
+        local_conn = get_db()
+        local_cursor = local_conn.cursor()
+        local_cursor.execute("""
             INSERT INTO technicians (name, location_id, color_hex)
             VALUES (?, ?, ?)
         """, (name, location_id, color_hex))
-        conn.commit()
+        local_conn.commit()
+        technician_id = local_cursor.lastrowid
+        local_conn.close()
         
-        return {"status": "success", "message": f"Technician '{name}' added successfully"}
+        return {"status": "success", "technician_id": technician_id, "message": f"Technician '{name}' added successfully"}
     except Exception as e:
         return {"status": "error", "message": f"Failed to add technician: {str(e)}"}
 
@@ -1907,8 +2761,12 @@ def update_technician(technician_id: int, name: str = Form(None), location_id: i
             return {"status": "error", "message": "No updates provided"}
         
         params.append(technician_id)
-        cursor.execute(f"UPDATE technicians SET {', '.join(updates)} WHERE id = ?", params)
-        conn.commit()
+        
+        local_conn = get_db()
+        local_cursor = local_conn.cursor()
+        local_cursor.execute(f"UPDATE technicians SET {', '.join(updates)} WHERE id = ?", params)
+        local_conn.commit()
+        local_conn.commit()
         
         return {"status": "success", "message": "Technician updated successfully"}
     except Exception as e:
@@ -1918,12 +2776,82 @@ def update_technician(technician_id: int, name: str = Form(None), location_id: i
 def delete_technician(technician_id: int):
     """Delete a technician"""
     try:
-        cursor.execute("DELETE FROM technicians WHERE id = ?", (technician_id,))
-        conn.commit()
+        local_conn = get_db()
+        local_cursor = local_conn.cursor()
+        local_cursor.execute("DELETE FROM technicians WHERE id = ?", (technician_id,))
+        local_conn.commit()
+        local_conn.close()
         
         return {"status": "success", "message": "Technician deleted successfully"}
     except Exception as e:
         return {"status": "error", "message": f"Failed to delete technician: {str(e)}"}
+
+@app.get("/technicians/{technician_id}/services")
+def get_technician_services(technician_id: int):
+    """Get all services assigned to a technician"""
+    try:
+        local_conn = get_db()
+        local_cursor = local_conn.cursor()
+        local_cursor.execute("""
+            SELECT s.id, s.name, s.service_type
+            FROM technician_services ts
+            JOIN services s ON ts.service_id = s.id
+            WHERE ts.technician_id = ?
+        """, (technician_id,))
+        services = local_cursor.fetchall()
+        local_conn.close()
+        
+        result = []
+        for svc in services:
+            result.append({
+                "id": svc[0],
+                "name": svc[1],
+                "service_type": svc[2]
+            })
+        
+        return {"status": "success", "services": result}
+    except Exception as e:
+        return {"status": "error", "message": f"Failed to get technician services: {str(e)}"}
+
+@app.post("/technicians/{technician_id}/services")
+def assign_service_to_technician(technician_id: int, service_id: int = Form(...)):
+    """Assign a service to a technician"""
+    try:
+        local_conn = get_db()
+        local_cursor = local_conn.cursor()
+        local_cursor.execute("""
+            INSERT INTO technician_services (technician_id, service_id)
+            VALUES (?, ?)
+        """, (technician_id, service_id))
+        local_conn.commit()
+        local_conn.close()
+        
+        return {"status": "success", "message": "Service assigned to technician"}
+    except sqlite3.IntegrityError:
+        return {"status": "error", "message": "Service already assigned to this technician"}
+    except Exception as e:
+        return {"status": "error", "message": f"Failed to assign service: {str(e)}"}
+
+@app.delete("/technicians/{technician_id}/services/{service_id}")
+def remove_service_from_technician(technician_id: int, service_id: int):
+    """Remove a service assignment from a technician"""
+    try:
+        local_conn = get_db()
+        local_cursor = local_conn.cursor()
+        local_cursor.execute("""
+            DELETE FROM technician_services 
+            WHERE technician_id = ? AND service_id = ?
+        """, (technician_id, service_id))
+        local_conn.commit()
+        deleted = local_cursor.rowcount > 0
+        local_conn.close()
+        
+        if deleted:
+            return {"status": "success", "message": "Service removed from technician"}
+        else:
+            return {"status": "error", "message": "Service assignment not found"}
+    except Exception as e:
+        return {"status": "error", "message": f"Failed to remove service: {str(e)}"}
 
 @app.get("/technician_territories")
 def get_technician_territories(request: Request):
@@ -1940,7 +2868,8 @@ def get_technician_territories(request: Request):
             # Office workers only see territories for their location
             cursor.execute("""
                 SELECT tt.id, tt.technician_id, tt.territory_name, tt.center_lat, tt.center_lng,
-                       tt.radius_miles, tt.polygon_coords, t.name as technician_name, t.color_hex
+                       tt.radius_miles, tt.polygon_coords, t.name as technician_name, t.color_hex,
+                       tt.service_type
                 FROM technician_territories tt
                 JOIN technicians t ON tt.technician_id = t.id
                 WHERE t.is_active = 1 AND t.location_id = ?
@@ -1949,7 +2878,8 @@ def get_technician_territories(request: Request):
             # Admin sees all territories
             cursor.execute("""
                 SELECT tt.id, tt.technician_id, tt.territory_name, tt.center_lat, tt.center_lng,
-                       tt.radius_miles, tt.polygon_coords, t.name as technician_name, t.color_hex
+                       tt.radius_miles, tt.polygon_coords, t.name as technician_name, t.color_hex,
+                       tt.service_type
                 FROM technician_territories tt
                 JOIN technicians t ON tt.technician_id = t.id
                 WHERE t.is_active = 1
@@ -1968,7 +2898,8 @@ def get_technician_territories(request: Request):
                 "radius_miles": territory[5],
                 "polygon_coords": territory[6],
                 "technician_name": territory[7],
-                "color_hex": territory[8]
+                "color_hex": territory[8],
+                "service_type": territory[9] if territory[9] else "chemical"
             })
         
         return {"status": "success", "territories": result}
@@ -2087,7 +3018,8 @@ def create_custom_territory(
     center_lat: float = Form(...),
     center_lng: float = Form(...),
     radius_miles: float = Form(...),
-    polygon_coords: str = Form(...)
+    polygon_coords: str = Form(...),
+    service_type: str = Form(default="chemical")
 ):
     """Create a custom territory with polygon coordinates"""
     try:
@@ -2097,15 +3029,15 @@ def create_custom_territory(
         if not technician:
             return {"status": "error", "message": "Technician not found or inactive"}
         
-        # Clear existing territory for this technician
-        cursor.execute("DELETE FROM technician_territories WHERE technician_id = ?", (technician_id,))
+        # Clear existing territory for this technician and service type
+        cursor.execute("DELETE FROM technician_territories WHERE technician_id = ? AND service_type = ?", (technician_id, service_type))
         
-        # Insert new custom territory
+        # Insert new custom territory with service type
         cursor.execute("""
             INSERT INTO technician_territories 
-            (technician_id, territory_name, center_lat, center_lng, radius_miles, polygon_coords)
-            VALUES (?, ?, ?, ?, ?, ?)
-        """, (technician_id, territory_name, center_lat, center_lng, radius_miles, polygon_coords))
+            (technician_id, territory_name, center_lat, center_lng, radius_miles, polygon_coords, service_type)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (technician_id, territory_name, center_lat, center_lng, radius_miles, polygon_coords, service_type))
         
         conn.commit()
         
@@ -2453,9 +3385,11 @@ def get_current_route():
 @app.get("/locations")
 def get_locations():
     """Get all locations"""
-    local_cursor = conn.cursor()
+    local_conn = get_db()
+    local_cursor = local_conn.cursor()
     local_cursor.execute("SELECT id, name, address, service_area_zips, phone FROM locations ORDER BY name ASC")
     rows = local_cursor.fetchall()
+    local_conn.close()
     locations = []
     for loc_id, name, address, service_area_zips, phone in rows:
         locations.append({
@@ -2481,12 +3415,15 @@ def create_location(name: str = Form(...), address: str = Form(default=""), serv
             except Exception as e:
                 print(f"Geocoding failed for address '{address}': {e}")
         
-        cursor.execute(
+        local_conn = get_db()
+        local_cursor = local_conn.cursor()
+        local_cursor.execute(
             "INSERT INTO locations (name, address, service_area_zips, phone, lat, lng) VALUES (?, ?, ?, ?, ?, ?)",
             (name, address, service_area_zips, phone, lat, lng)
         )
-        conn.commit()
-        loc_id = cursor.lastrowid
+        local_conn.commit()
+        loc_id = local_cursor.lastrowid
+        local_conn.close()
         return {"status": "success", "id": loc_id, "message": f"Location '{name}' created"}
     except sqlite3.IntegrityError:
         return {"status": "error", "message": "Location name already exists"}
@@ -2498,9 +3435,12 @@ def create_location(name: str = Form(...), address: str = Form(default=""), serv
 def update_location(location_id: int, name: str = Form(...), address: str = Form(default=""), service_area_zips: str = Form(default=""), phone: str = Form(default="")):
     """Update a location with automatic geocoding if address changes"""
     try:
+        local_conn = get_db()
+        local_cursor = local_conn.cursor()
+        
         # Check if address is being updated
-        cursor.execute("SELECT address FROM locations WHERE id = ?", (location_id,))
-        current_data = cursor.fetchone()
+        local_cursor.execute("SELECT address FROM locations WHERE id = ?", (location_id,))
+        current_data = local_cursor.fetchone()
         current_address = current_data[0] if current_data else None
         
         # Geocode the new address to get lat/lng if address changed
@@ -2513,12 +3453,15 @@ def update_location(location_id: int, name: str = Form(...), address: str = Form
             except Exception as e:
                 print(f"Geocoding failed for address '{address}': {e}")
         
-        cursor.execute(
+        local_cursor.execute(
             "UPDATE locations SET name = ?, address = ?, service_area_zips = ?, phone = ?, lat = ?, lng = ? WHERE id = ?",
             (name, address, service_area_zips, phone, lat, lng, location_id)
         )
-        conn.commit()
-        if cursor.rowcount > 0:
+        local_conn.commit()
+        success = local_cursor.rowcount > 0
+        local_conn.close()
+        
+        if success:
             return {"status": "success", "message": f"Location updated"}
         else:
             return {"status": "error", "message": "Location not found"}
@@ -2532,15 +3475,22 @@ def update_location(location_id: int, name: str = Form(...), address: str = Form
 def delete_location(location_id: int):
     """Delete a location"""
     try:
+        local_conn = get_db()
+        local_cursor = local_conn.cursor()
+        
         # Check if location has customers
-        cursor.execute("SELECT COUNT(*) FROM customers WHERE location_id = ?", (location_id,))
-        count = cursor.fetchone()[0]
+        local_cursor.execute("SELECT COUNT(*) FROM customers WHERE location_id = ?", (location_id,))
+        count = local_cursor.fetchone()[0]
         if count > 0:
+            local_conn.close()
             return {"status": "error", "message": f"Cannot delete location with {count} customer(s). Reassign customers first."}
         
-        cursor.execute("DELETE FROM locations WHERE id = ?", (location_id,))
-        conn.commit()
-        if cursor.rowcount > 0:
+        local_cursor.execute("DELETE FROM locations WHERE id = ?", (location_id,))
+        local_conn.commit()
+        success = local_cursor.rowcount > 0
+        local_conn.close()
+        
+        if success:
             return {"status": "success", "message": "Location deleted"}
         else:
             return {"status": "error", "message": "Location not found"}
@@ -3017,6 +3967,11 @@ def get_daily_routes(request: Request, location_id: int = None, date: str = None
     """
     Generate optimized daily routes for all technicians at a location.
     Office workers see their assigned location only, admins can specify location.
+    
+    SERVICE-CENTRIC APPROACH:
+    - For each service type (chemical, mowing, pest), find customers due for that service
+    - Assign to technicians qualified for that service with matching territories
+    - Customers can appear on multiple routes if they have multiple services due
     """
     if not request.session.get('logged_in'):
         return {"status": "error", "message": "Not authenticated"}
@@ -3043,14 +3998,12 @@ def get_daily_routes(request: Request, location_id: int = None, date: str = None
         office_lat, office_lng, office_address = loc_data
         
         if not office_lat or not office_lng:
-            # Fallback: geocode the address
             office_lat, office_lng = geocode_address(office_address or "Keller, TX")
         
-        # Get all active technicians at this location with their territories
+        # Get all active technicians at this location
         cursor.execute("""
-            SELECT t.id, t.name, t.color_hex, tt.polygon_coords
+            SELECT t.id, t.name, t.color_hex
             FROM technicians t
-            LEFT JOIN technician_territories tt ON t.id = tt.technician_id
             WHERE t.location_id = ? AND t.is_active = 1
         """, (target_location,))
         
@@ -3059,40 +4012,91 @@ def get_daily_routes(request: Request, location_id: int = None, date: str = None
         if not technicians:
             return {"status": "error", "message": "No active technicians at this location"}
         
-        # Generate routes for each technician
+        # Pre-load all territories for these technicians (by service type)
+        tech_ids = [t[0] for t in technicians]
+        placeholders = ','.join('?' * len(tech_ids))
+        cursor.execute(f"""
+            SELECT technician_id, polygon_coords, service_type
+            FROM technician_territories
+            WHERE technician_id IN ({placeholders})
+        """, tech_ids)
+        
+        tech_territories = {}  # tech_id -> {service_type: [coords, ...]}
+        for row in cursor.fetchall():
+            tech_id, polygon_coords, service_type = row
+            if tech_id not in tech_territories:
+                tech_territories[tech_id] = {}
+            svc = service_type or 'chemical'
+            if svc not in tech_territories[tech_id]:
+                tech_territories[tech_id][svc] = []
+            if polygon_coords:
+                try:
+                    tech_territories[tech_id][svc].append(json.loads(polygon_coords))
+                except:
+                    pass
+        
+        # Get technician services mapping (what each tech is qualified for)
+        cursor.execute("""
+            SELECT ts.technician_id, s.service_type, s.id as service_id
+            FROM technician_services ts
+            JOIN services s ON ts.service_id = s.id
+            WHERE s.is_active = 1 AND ts.technician_id IN ({})
+        """.format(placeholders), tech_ids)
+        
+        technician_qualified_services = {}  # tech_id -> [service_type, ...]
+        for row in cursor.fetchall():
+            tech_id, svc_type, svc_id = row
+            if tech_id not in technician_qualified_services:
+                technician_qualified_services[tech_id] = []
+            if svc_type not in technician_qualified_services[tech_id]:
+                technician_qualified_services[tech_id].append(svc_type)
+        
+        # Get service frequency for this location
+        rounds_count = get_rounds_count_for_location(target_location)
+        if rounds_count == 0:
+            return {
+                "status": "error", 
+                "message": "Add treatment rounds to show due customers"
+            }
+        
+        days_between = round(365 / rounds_count)
+        
+        # Get all customers at this location with their active services
+        cursor.execute("""
+            SELECT 
+                c.id, c.name, c.address, c.sqft, c.actual_price, 
+                c.lat, c.lng, c.last_service_date
+            FROM customers c
+            WHERE c.location_id = ? AND c.lat IS NOT NULL AND c.lng IS NOT NULL
+        """, (target_location,))
+        
+        all_customers = cursor.fetchall()
+        
+        # Get per-service completion dates for all customers
+        cursor.execute("""
+            SELECT cs.customer_id, s.service_type, cs.last_completed_date
+            FROM customer_services cs
+            JOIN services s ON cs.service_id = s.id
+            WHERE s.is_active = 1
+        """)
+        
+        customer_service_dates = {}  # (customer_id, service_type) -> last_completed_date
+        for row in cursor.fetchall():
+            cust_id, svc_type, last_date = row
+            customer_service_dates[(cust_id, svc_type)] = last_date
+        
+        # Get service types we care about
+        service_types = ['chemical', 'mowing', 'pest']
+        
+        # For each technician, build their route by service type
         daily_routes = []
         
         for tech in technicians:
-            tech_id, tech_name, tech_color, polygon_coords = tech
+            tech_id, tech_name, tech_color = tech
             
-            if not polygon_coords:
-                daily_routes.append({
-                    "technician_id": tech_id,
-                    "technician_name": tech_name,
-                    "technician_color": tech_color,
-                    "customers": [],
-                    "message": "No territory assigned"
-                })
-                continue
-            
-            try:
-                coords = json.loads(polygon_coords)
-            except:
-                daily_routes.append({
-                    "technician_id": tech_id,
-                    "technician_name": tech_name,
-                    "technician_color": tech_color,
-                    "customers": [],
-                    "message": "Invalid territory data"
-                })
-                continue
-            
-            # Get due customers in this technician's territory (using location-specific frequency)
-            # Count rounds from treatment_plans for this location
-            rounds_count = get_rounds_count_for_location(target_location)
-            if rounds_count == 0:
-                # No rounds configured - skip this location
-                print(f"Tech {tech_name}: No rounds configured for location {target_location}, skipping")
+            # Get what this tech is qualified for
+            qualified_services = technician_qualified_services.get(tech_id, [])
+            if not qualified_services:
                 daily_routes.append({
                     "technician_id": tech_id,
                     "technician_name": tech_name,
@@ -3106,50 +4110,90 @@ def get_daily_routes(request: Request, location_id: int = None, date: str = None
                     "total_time_minutes": 0,
                     "customer_count": 0,
                     "remaining_due": 0,
-                    "message": "Add treatment rounds to show due customers"
+                    "message": "No services assigned"
                 })
                 continue
             
-            days_between = round(365 / rounds_count)
+            # Get territories for this tech (by service type)
+            tech_tech_territories = tech_territories.get(tech_id, {})
+            if not tech_tech_territories:
+                daily_routes.append({
+                    "technician_id": tech_id,
+                    "technician_name": tech_name,
+                    "technician_color": tech_color,
+                    "customers": [],
+                    "total_sqft": 0,
+                    "total_revenue": 0,
+                    "total_drive_miles": 0,
+                    "total_service_minutes": 0,
+                    "total_drive_minutes": 0,
+                    "total_time_minutes": 0,
+                    "customer_count": 0,
+                    "remaining_due": 0,
+                    "message": "No territory assigned"
+                })
+                continue
             
-            cursor.execute("""
-                SELECT 
-                    c.id, c.name, c.address, c.sqft, c.actual_price, 
-                    c.lat, c.lng, c.last_service_date,
-                    julianday('now') - julianday(c.last_service_date) as days_since_service
-                FROM customers c
-                WHERE c.location_id = ? AND c.lat IS NOT NULL AND c.lng IS NOT NULL
-                    AND (c.last_service_date IS NULL OR julianday('now') - julianday(c.last_service_date) > ?)
-            """, (target_location, days_between))
+            # Collect all due customers for this tech, grouped by service
+            tech_customers = {}  # customer_id -> {customer_data, services: [svc_types]}
             
-            all_due_customers = cursor.fetchall()
-            print(f"Tech {tech_name}: Found {len(all_due_customers)} total due customers at location {target_location}")
-            print(f"Tech {tech_name}: Territory coords: {coords[:3] if coords else 'none'}...")
+            for svc_type in qualified_services:
+                # Skip if tech has no territory for this service type
+                if svc_type not in tech_tech_territories:
+                    continue
+                
+                svc_territories = tech_tech_territories[svc_type]
+                
+                # Find all customers due for this specific service
+                for row in all_customers:
+                    cust_id, name, address, sqft, price, lat, lng, cust_last_date = row
+                    
+                    # Check if customer is due for THIS service
+                    # Use per-service last_completed_date if available, fallback to customer last_service_date
+                    last_svc_date = customer_service_dates.get((cust_id, svc_type), cust_last_date)
+                    
+                    is_due = False
+                    if last_svc_date is None:
+                        is_due = True  # Never serviced
+                    else:
+                        days_since = (datetime.now() - datetime.fromisoformat(last_svc_date)).days
+                        is_due = days_since > days_between
+                    
+                    if not is_due:
+                        continue
+                    
+                    # Check if customer is in ANY territory for this service type
+                    in_territory = False
+                    for territory_coords in svc_territories:
+                        if point_in_polygon(lat, lng, territory_coords):
+                            in_territory = True
+                            break
+                    
+                    if not in_territory:
+                        continue
+                    
+                    # Add to tech's customers
+                    if cust_id not in tech_customers:
+                        tech_customers[cust_id] = {
+                            "id": cust_id,
+                            "name": name,
+                            "address": address,
+                            "sqft": sqft or 0,
+                            "actual_price": price or 0,
+                            "lat": lat,
+                            "lng": lng,
+                            "services": [],
+                            "days_since_service": days_since if last_svc_date else 999
+                        }
+                    
+                    if svc_type not in tech_customers[cust_id]["services"]:
+                        tech_customers[cust_id]["services"].append(svc_type)
             
-            customers = []
-            for row in all_due_customers:
-                lat, lng = row[5], row[6]
-                print(f"  Checking {row[1]} at ({lat}, {lng}) in polygon...")
-                in_poly = point_in_polygon(lat, lng, coords)
-                print(f"    -> point_in_polygon result: {in_poly}")
-                if in_poly:
-                    customers.append({
-                        "id": row[0],
-                        "name": row[1],
-                        "address": row[2],
-                        "sqft": row[3] or 0,
-                        "actual_price": row[4] or 0,
-                        "lat": row[5],
-                        "lng": row[6],
-                        "days_since_service": row[8] or 999
-                    })
-            
-            print(f"Tech {tech_name}: {len(customers)} customers in territory")
-            
-            # Sort by days since service (most overdue first)
+            # Convert to list and sort
+            customers = list(tech_customers.values())
             customers.sort(key=lambda x: x["days_since_service"], reverse=True)
             
-            # Optimize route with capacity constraints (200k sqft or $1500)
+            # Optimize route with capacity constraints
             MAX_SQFT = 200000
             MAX_REVENUE = 1500.0
             
@@ -3162,7 +4206,6 @@ def get_daily_routes(request: Request, location_id: int = None, date: str = None
             remaining = customers.copy()
             
             while remaining:
-                # Find nearest customer
                 nearest_idx = None
                 nearest_dist = float('inf')
                 
@@ -3177,14 +4220,12 @@ def get_daily_routes(request: Request, location_id: int = None, date: str = None
                 
                 customer = remaining[nearest_idx]
                 
-                # Check capacity constraints
                 new_sqft = total_sqft + customer["sqft"]
                 new_revenue = total_revenue + customer["actual_price"]
                 
                 if new_sqft > MAX_SQFT or new_revenue > MAX_REVENUE:
                     break
                 
-                # Add to route with metrics
                 customer["drive_miles"] = round(nearest_dist, 2)
                 customer["drive_minutes"] = round((nearest_dist / 30) * 60, 1)
                 customer["service_minutes"] = round(customer["sqft"] / 1000, 1)
@@ -3197,7 +4238,7 @@ def get_daily_routes(request: Request, location_id: int = None, date: str = None
                 current_lng = customer["lng"]
                 remaining.pop(nearest_idx)
             
-            # Calculate totals including return to office
+            # Calculate totals
             total_drive_miles = sum(c["drive_miles"] for c in route)
             total_service_minutes = sum(c["service_minutes"] for c in route)
             total_drive_minutes = sum(c["drive_minutes"] for c in route)
@@ -3241,6 +4282,8 @@ def get_daily_routes(request: Request, location_id: int = None, date: str = None
             }
         }
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return {"status": "error", "message": str(e)}
 
 # ========== TECHNICIAN MOBILE API ENDPOINTS ==========
@@ -4322,3 +5365,277 @@ async def tech_test_page():
     </body>
     </html>
     """
+
+# ========== PAYMENT PROCESSOR API ENDPOINTS ==========
+
+@app.get("/payment-processors")
+def get_payment_processors():
+    """Get all payment processors configured (global/company-wide)"""
+    try:
+        cursor.execute("""
+            SELECT id, processor_type, is_enabled, config_json, created_at, updated_at
+            FROM payment_processors
+        """)
+        
+        rows = cursor.fetchall()
+        processors = []
+        for row in rows:
+            processors.append({
+                "id": row[0],
+                "processor_type": row[1],
+                "is_enabled": bool(row[2]),
+                "config_json": row[3],
+                "created_at": row[4],
+                "updated_at": row[5]
+            })
+        
+        return {"status": "success", "processors": processors}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@app.post("/payment-processors")
+def save_payment_processor(
+    processor_type: str = Form(...),
+    is_enabled: bool = Form(...),
+    config_json: str = Form(...),
+    secret_key: str = Form(default="")
+):
+    """Save or update a payment processor configuration (global/company-wide)"""
+    try:
+        # Encrypt the secret key if provided
+        secret_key_encrypted = None
+        if secret_key:
+            secret_key_encrypted = encrypt_secret(secret_key)
+        
+        # Check if this processor already exists
+        cursor.execute("""
+            SELECT id, secret_key_encrypted FROM payment_processors 
+            WHERE processor_type = ?
+        """, (processor_type,))
+        
+        existing = cursor.fetchone()
+        
+        if existing:
+            # Update existing
+            if secret_key_encrypted:
+                cursor.execute("""
+                    UPDATE payment_processors 
+                    SET is_enabled = ?, config_json = ?, secret_key_encrypted = ?, updated_at = CURRENT_TIMESTAMP
+                    WHERE processor_type = ?
+                """, (is_enabled, config_json, secret_key_encrypted, processor_type))
+            else:
+                # Keep existing encrypted secret key if not provided
+                cursor.execute("""
+                    UPDATE payment_processors 
+                    SET is_enabled = ?, config_json = ?, updated_at = CURRENT_TIMESTAMP
+                    WHERE processor_type = ?
+                """, (is_enabled, config_json, processor_type))
+        else:
+            # Insert new
+            cursor.execute("""
+                INSERT INTO payment_processors (processor_type, is_enabled, config_json, secret_key_encrypted)
+                VALUES (?, ?, ?, ?)
+            """, (processor_type, is_enabled, config_json, secret_key_encrypted))
+        
+        conn.commit()
+        return {"status": "success", "message": f"{processor_type} configuration saved"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@app.delete("/payment-processors/{processor_id}")
+def delete_payment_processor(processor_id: int):
+    """Delete a payment processor configuration"""
+    try:
+        cursor.execute("DELETE FROM payment_processors WHERE id = ?", (processor_id,))
+        conn.commit()
+        
+        if cursor.rowcount > 0:
+            return {"status": "success", "message": "Payment processor removed"}
+        else:
+            return {"status": "error", "message": "Payment processor not found"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+# ========== STRIPE PAYMENT ENDPOINTS ==========
+
+@app.get("/stripe/config")
+def get_stripe_config():
+    """Get Stripe publishable key for frontend"""
+    try:
+        cursor.execute("""
+            SELECT config_json FROM payment_processors 
+            WHERE processor_type = 'stripe' AND is_enabled = 1
+        """)
+        row = cursor.fetchone()
+        
+        if not row:
+            return {"status": "error", "message": "Stripe not configured"}
+        
+        config = json.loads(row[0] or '{}')
+        return {
+            "status": "success",
+            "publishable_key": config.get('publishable_key', ''),
+            "test_mode": config.get('test_mode', False)
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@app.post("/stripe/save-payment-method")
+def save_payment_method(
+    customer_id: int = Form(...),
+    payment_method_id: str = Form(...)
+):
+    """Save Stripe payment method to customer by creating a Stripe Customer and attaching the PaymentMethod"""
+    try:
+        # Get customer details from database
+        cursor.execute("SELECT name FROM customers WHERE rowid = ?", (customer_id,))
+        customer_row = cursor.fetchone()
+        if not customer_row:
+            return {"status": "error", "message": "Customer not found"}
+        
+        customer_name = customer_row[0]
+        
+        # Get Stripe secret key from database
+        cursor.execute("""
+            SELECT secret_key_encrypted, config_json FROM payment_processors 
+            WHERE processor_type = 'stripe' AND is_enabled = 1
+        """)
+        row = cursor.fetchone()
+        
+        if not row:
+            return {"status": "error", "message": "Stripe not configured"}
+        
+        # Decrypt the secret key
+        secret_key_encrypted = row[0]
+        secret_key = decrypt_secret(secret_key_encrypted) if secret_key_encrypted else None
+        
+        if not secret_key:
+            return {"status": "error", "message": "Stripe secret key not configured"}
+        
+        try:
+            import stripe
+        except ImportError:
+            return {"status": "error", "message": "Stripe library not installed. Run: pip install stripe"}
+        
+        stripe.api_key = secret_key
+        
+        # Check if customer already has a stripe_customer_id stored
+        cursor.execute("SELECT stripe_customer_id FROM customers WHERE rowid = ?", (customer_id,))
+        existing = cursor.fetchone()
+        stripe_customer_id = existing[0] if existing and existing[0] else None
+        
+        # Create Stripe Customer if doesn't exist
+        if not stripe_customer_id:
+            stripe_customer = stripe.Customer.create(
+                name=customer_name,
+                metadata={'internal_customer_id': customer_id}
+            )
+            stripe_customer_id = stripe_customer.id
+            
+            # Save stripe_customer_id to database
+            cursor.execute("""
+                UPDATE customers 
+                SET stripe_customer_id = ?
+                WHERE rowid = ?
+            """, (stripe_customer_id, customer_id))
+            conn.commit()
+        
+        # Attach the PaymentMethod to the Stripe Customer
+        stripe.PaymentMethod.attach(payment_method_id, customer=stripe_customer_id)
+        
+        # Set as default payment method
+        stripe.Customer.modify(
+            stripe_customer_id,
+            invoice_settings={'default_payment_method': payment_method_id}
+        )
+        
+        # Store the payment method ID with the customer
+        cursor.execute("""
+            UPDATE customers 
+            SET stripe_payment_method_id = ?
+            WHERE rowid = ?
+        """, (payment_method_id, customer_id))
+        
+        conn.commit()
+        
+        return {
+            "status": "success",
+            "message": "Payment method saved and attached to customer"
+        }
+            
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@app.post("/stripe/charge")
+def create_stripe_charge(
+    customer_id: int = Form(...),
+    amount: float = Form(...),
+    stripe_token: str = Form(...),
+    description: str = Form(default="")
+):
+    """Process a Stripe payment using tokenized card data"""
+    try:
+        # Get Stripe secret key from database
+        cursor.execute("""
+            SELECT secret_key_encrypted, config_json FROM payment_processors 
+            WHERE processor_type = 'stripe' AND is_enabled = 1
+        """)
+        row = cursor.fetchone()
+        
+        if not row:
+            return {"status": "error", "message": "Stripe not configured"}
+        
+        # Decrypt the secret key
+        secret_key_encrypted = row[0]
+        secret_key = decrypt_secret(secret_key_encrypted) if secret_key_encrypted else None
+        
+        if not secret_key:
+            return {"status": "error", "message": "Stripe secret key not configured"}
+        
+        config = json.loads(row[1] or '{}')
+        test_mode = config.get('test_mode', False)
+        
+        # Import stripe library
+        try:
+            import stripe
+        except ImportError:
+            return {"status": "error", "message": "Stripe library not installed. Run: pip install stripe"}
+        
+        # Set the API key and process payment
+        stripe.api_key = secret_key
+        
+        # Create charge
+        charge = stripe.PaymentIntent.create(
+            amount=int(amount * 100),  # Convert to cents
+            currency='usd',
+            payment_method=stripe_token,
+            confirm=True,
+            description=description or f"Lawn care service - Customer {customer_id}",
+            metadata={
+                'customer_id': customer_id,
+                'internal_customer_id': customer_id
+            }
+        )
+        
+        # Record payment in database
+        cursor.execute("""
+            INSERT INTO payments (customer_id, amount, processor_type, processor_tx_id, status, description)
+            VALUES (?, ?, 'stripe', ?, 'completed', ?)
+        """, (customer_id, amount, charge.id, description))
+        
+        conn.commit()
+        
+        return {
+            "status": "success",
+            "message": "Payment processed successfully",
+            "transaction_id": charge.id,
+            "amount": amount
+        }
+        
+    except Exception as e:
+        return {"status": "error", "message": str(e)}

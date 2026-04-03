@@ -8,6 +8,7 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://js.stripe.com/v3/"></script>
     <style>
         :root {
             --primary: #2563eb;
@@ -526,6 +527,20 @@
         <div class="content-grid">
             <div class="card form-card">
                 <h3><i class="fas fa-plus-circle"></i> Add New Customer</h3>
+                
+                <!-- Service Selection Checkboxes -->
+                <div id="newCustomerServices" style="margin-bottom: 1rem; padding: 0.75rem; background: var(--gray-50); border-radius: 8px; border: 1px solid var(--border);">
+                    <label style="font-size: 0.85rem; font-weight: 600; color: var(--dark); display: block; margin-bottom: 0.5rem;">
+                        <i class="fas fa-concierge-bell"></i> Select Services for Quote
+                    </label>
+                    <div id="serviceCheckboxes" style="display: flex; flex-wrap: wrap; gap: 0.75rem;">
+                        <span style="color: var(--gray-500); font-size: 0.8rem; font-style: italic;">Loading services...</span>
+                    </div>
+                    <div id="serviceQuoteDisplay" style="margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px dashed var(--border); font-size: 0.8rem; color: var(--gray-600);">
+                        Select services to see estimated price range
+                    </div>
+                </div>
+
                 <form id="customerForm">
                     <div class="form-group">
                         <label><i class="fas fa-user"></i> Customer Name</label>
@@ -576,8 +591,8 @@
                         <div style="font-size: 0.85rem; color: var(--gray-600);">Acres</div>
                     </div>
                     <div style="flex: 1; min-width: 150px; background: var(--gray-50); padding: 1rem; border-radius: 8px; text-align: center;">
-                        <div style="font-size: 1.5rem; font-weight: 700; color: var(--warning);" id="quoteResult">$0 - $0</div>
-                        <div style="font-size: 0.85rem; color: var(--gray-600);">Est. Price Range</div>
+                        <div style="font-size: 1.5rem; font-weight: 700; color: var(--warning);" id="perimeterResult">0 ft</div>
+                        <div style="font-size: 0.85rem; color: var(--gray-600);">Perimeter</div>
                     </div>
                 </div>
                 
@@ -605,6 +620,8 @@
             let editingElements = new Set();
             let customerData = [];
             let grassTypes = []; // Store grass types for the user's location
+            let availableServices = []; // Store available services for the location
+            let customerServices = {}; // Map of customer_id -> {service_id: {price, active}}
 
             const list = document.getElementById("customerList");
             const searchInput = document.getElementById("search");
@@ -620,18 +637,225 @@
                     const data = await res.json();
                     customerData = data.customers;
                     
-                    // Also load grass types for the user's location
-                    await loadGrassTypes();
-
+                    // Render immediately with what we have
                     if (editingElements.size === 0) {
                         renderCustomers();
                         updateStats();
                     }
+                    
+                    // Load additional data in background (don't block rendering)
+                    Promise.all([
+                        loadGrassTypes(),
+                        loadServices(),
+                        loadAllCustomerServices()
+                    ]).then(() => {
+                        // Re-render once additional data loads to show services/grass types
+                        if (editingElements.size === 0) {
+                            renderCustomers();
+                        }
+                    }).catch(e => {
+                        console.error("Background load error:", e);
+                    });
+                    
                 } catch (e) {
                     console.error("Fetch error:", e);
                     if (editingElements.size === 0) {
                         list.innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><h3>Error loading customers</h3></div>';
                     }
+                }
+            }
+            
+            async function loadServices() {
+                try {
+                    const meRes = await fetch('/me');
+                    const meData = await meRes.json();
+                    let locationId = meData.location_id;
+                    
+                    if (!locationId) {
+                        const locRes = await fetch('/locations');
+                        const locData = await locRes.json();
+                        if (locData.locations && locData.locations.length > 0) {
+                            locationId = locData.locations[0].id;
+                        }
+                    }
+                    
+                    let url = '/services';
+                    if (locationId) {
+                        url += `?location_id=${locationId}`;
+                    }
+                    
+                    const res = await fetch(url);
+                    if (!res.ok) throw new Error("API error: " + res.status);
+                    const data = await res.json();
+                    availableServices = data.services || [];
+                    console.log('Loaded services:', availableServices);
+                } catch (e) {
+                    console.error("Error loading services:", e);
+                    availableServices = [];
+                }
+            }
+            
+            async function loadAllCustomerServices() {
+                try {
+                    // Load services for each customer
+                    const promises = customerData.map(c => {
+                        const rowid = c[9];
+                        const locationId = c[17]; // location_id from customer data
+                        
+                        // Load both services and mowing rounds for this customer
+                        return Promise.all([
+                            fetch(`/customers/${rowid}/services`)
+                                .then(res => res.json())
+                                .then(data => {
+                                    if (data.status === 'success') {
+                                        const servicesMap = {};
+                                        data.services.forEach(s => {
+                                            servicesMap[s.id] = { 
+                                                price: s.price, 
+                                                active: s.is_active,
+                                                last_completed_date: s.last_completed_date
+                                            };
+                                        });
+                                        customerServices[rowid] = servicesMap;
+                                    }
+                                })
+                                .catch(e => console.error(`Error loading services for customer ${rowid}:`, e)),
+                            // Load mowing rounds for this customer's location
+                            locationId ? loadMowingRoundsForLocation(locationId) : Promise.resolve()
+                        ]);
+                    });
+                    
+                    await Promise.all(promises);
+                    console.log('Loaded customer services and mowing rounds:', customerServices, locationMowingRounds);
+                } catch (e) {
+                    console.error("Error loading customer services:", e);
+                }
+            }
+            
+            // Store mowing rounds count per location (locationId -> roundsCount)
+            let locationMowingRounds = {};
+
+            // Fetch mowing rounds for a location
+            async function loadMowingRoundsForLocation(locationId) {
+                if (!locationId || locationMowingRounds[locationId] !== undefined) {
+                    return locationMowingRounds[locationId] || 0;
+                }
+                try {
+                    const res = await fetch(`/mowing-rounds?location_id=${locationId}`);
+                    const data = await res.json();
+                    if (data.status === 'success') {
+                        locationMowingRounds[locationId] = data.rounds?.length || 0;
+                    } else {
+                        locationMowingRounds[locationId] = 0;
+                    }
+                } catch (e) {
+                    console.error('Error loading mowing rounds:', e);
+                    locationMowingRounds[locationId] = 0;
+                }
+                return locationMowingRounds[locationId];
+            }
+
+            // Get visits per year for a service based on location configuration
+            function getVisitsPerYear(serviceType, locationId) {
+                if (serviceType === 'chemical') return 9;
+                if (serviceType === 'mowing') {
+                    // Use actual rounds count from location, fallback to 26 (bi-weekly)
+                    const rounds = locationMowingRounds[locationId] || 26;
+                    return rounds > 0 ? rounds : 26;
+                }
+                return 12; // Default for other services
+            }
+
+            async function toggleService(customerId, serviceId, isChecked) {
+                try {
+                    if (isChecked) {
+                        // Assign service with default price
+                        const formData = new URLSearchParams();
+                        formData.append('service_id', serviceId);
+                        formData.append('price', 0);
+                        
+                        const res = await fetch(`/customers/${customerId}/services`, {
+                            method: "POST",
+                            body: formData
+                        });
+                        
+                        const data = await res.json();
+                        if (data.status === "success") {
+                            // Update local state
+                            if (!customerServices[customerId]) customerServices[customerId] = {};
+                            customerServices[customerId][serviceId] = { price: 0, active: true };
+                            renderCustomers();
+                        } else {
+                            alert("Failed to assign service: " + (data.message || "Unknown error"));
+                        }
+                    } else {
+                        // Remove service
+                        const res = await fetch(`/customers/${customerId}/services/${serviceId}`, {
+                            method: "DELETE"
+                        });
+                        
+                        const data = await res.json();
+                        if (data.status === "success") {
+                            // Update local state
+                            if (customerServices[customerId]) {
+                                delete customerServices[customerId][serviceId];
+                            }
+                            renderCustomers();
+                        } else {
+                            alert("Failed to remove service: " + (data.message || "Unknown error"));
+                        }
+                    }
+                } catch (e) {
+                    console.error("Toggle service error:", e);
+                    alert("Failed to update service");
+                }
+            }
+            
+            async function updateServicePrice(customerId, serviceId, price) {
+                try {
+                    const formData = new URLSearchParams();
+                    formData.append('price', price);
+                    
+                    const res = await fetch(`/customers/${customerId}/services/${serviceId}/price`, {
+                        method: "POST",
+                        body: formData
+                    });
+                    
+                    const data = await res.json();
+                    if (data.status === "success") {
+                        // Update local state
+                        if (!customerServices[customerId]) customerServices[customerId] = {};
+                        if (!customerServices[customerId][serviceId]) customerServices[customerId][serviceId] = {};
+                        customerServices[customerId][serviceId].price = parseFloat(price);
+                        
+                        // Refresh display to show updated annual revenue
+                        renderCustomers();
+                    } else if (data.message === "Service assignment not found") {
+                        // Service not assigned yet, assign it with this price
+                        const assignFormData = new URLSearchParams();
+                        assignFormData.append('service_id', serviceId);
+                        assignFormData.append('price', price);
+                        
+                        const assignRes = await fetch(`/customers/${customerId}/services`, {
+                            method: "POST",
+                            body: assignFormData
+                        });
+                        
+                        const assignData = await assignRes.json();
+                        if (assignData.status === "success") {
+                            // Update local state
+                            if (!customerServices[customerId]) customerServices[customerId] = {};
+                            customerServices[customerId][serviceId] = { price: parseFloat(price), active: true };
+                            renderCustomers();
+                        } else {
+                            alert("Failed to assign service: " + (assignData.message || "Unknown error"));
+                        }
+                    } else {
+                        alert("Failed to update price: " + (data.message || "Unknown error"));
+                    }
+                } catch (e) {
+                    console.error("Update service price error:", e);
+                    alert("Failed to update price");
                 }
             }
             
@@ -726,7 +950,7 @@
                     list.innerHTML += `
     <div class="customer-item">
         <div class="customer-header">
-            <div class="customer-name">${c[0]}</div>
+            <div class="customer-name">${c[0]} ${c[19] ? '<span style="margin-left: 0.5rem; color: #635BFF; font-size: 0.85rem;" title="Payment method saved"><i class="fas fa-credit-card"></i></span>' : ''}</div>
             <div class="customer-meta">
                 <span><i class="fas fa-map-marker-alt"></i> ${c[1]}</span>
                 <span><i class="fas fa-phone"></i> ${c[2]}</span>
@@ -735,45 +959,26 @@
                     ${c[8] === 'due' ? 'background: #fef2f2; color: #dc2626; border: 1px solid #fecaca;' : 'background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0;'}">
                     ${c[8] === 'due' ? '🚨 DUE NOW' : '✅ CURRENT'}
                 </span>
-                ${c[12] ? '' : '<span class="price-range"><i class="fas fa-dollar-sign"></i> $' + c[4].toFixed(0) + ' - $' + c[5].toFixed(0) + '/service</span>'}
-                ${c[12] ? `<br><span style="color: var(--primary); font-weight: 600;"><i class="fas fa-check-circle"></i> Actual: $${c[12].toFixed(0)}</span>` : ''}
-                <div style="margin-top: 0.5rem; padding: 0.5rem; background: #f8fafc; border-radius: 8px; border: 1px solid #e5e7eb;">
-                    <label style="font-size: 0.85rem; color: #6b7280; display: block; margin-bottom: 0.25rem;">Actual Price:</label>
-                    <input type="number" step="0.01" min="0" id="price-${rowid}" style="width:100px;padding:0.4rem;border:1px solid #d1d5db;border-radius:6px;" value="${c[12] || ''}" placeholder="$0.00">
-                    <button onclick="confirmPrice(${rowid})" style="margin-left:0.5rem;padding:0.4rem 0.8rem;background:var(--primary);color:var(--white);border:none;border-radius:6px;font-size:0.8rem;cursor:pointer;transition:all 0.2s ease;">Confirm</button>
-                </div>
+                ${(() => {
+                    // Calculate annual revenue from customer_services
+                    const custServices = customerServices[rowid] || {};
+                    const locationId = c[17]; // location_id from customer data
+                    let annualRevenue = 0;
+                    availableServices.forEach(svc => {
+                        if (custServices[svc.id]?.active && custServices[svc.id]?.price > 0) {
+                            const visitsPerYear = getVisitsPerYear(svc.service_type, locationId);
+                            annualRevenue += custServices[svc.id].price * visitsPerYear;
+                        }
+                    });
+                    return annualRevenue > 0 ? `<span style="color: var(--success); font-weight: 600;"><i class="fas fa-dollar-sign"></i> $${annualRevenue.toFixed(0)}/year</span>` : '';
+                })()}
                 <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem; flex-wrap: wrap;">
                     <button class="btn btn-small" style="background: var(--success); color: var(--white); border: none;" onclick="measureCustomer(${rowid}, '${c[1].replace(/'/g, "\\'")}')">
                         <i class="fas fa-ruler-combined"></i> ${c[13] ? 'View Measurement' : 'Measure Property'}
                     </button>
-                    ${(() => {
-                                const raw = c[7];
-                                if (!raw || raw === "null" || raw === "None" || raw === "" || raw === "0") {
-                                    return `
-                            <button class="btn btn-small" style="background:var(--primary);color:var(--white);border:none;transition:all 0.2s ease;" onclick="markService(${rowid}, this)">
-                                <i class="fas fa-check-circle"></i> Mark Serviced
-                            </button>
-                            `;
-                                }
-                                try {
-                                    const d = new Date(raw);
-                                    if (isNaN(d.getTime())) throw new Error();
-                                    // Use backend-calculated next due date if available, fallback to 45 days
-                                    const nextDueDate = c[18] ? new Date(c[18]) : new Date(d.getTime() + (c[17] || 45) * 86400000);
-                                    return `
-                            <div style="padding:0.5rem;background:var(--primary);border-radius:8px;margin-top:0.5rem;font-size:0.8rem;color:var(--white);">
-                                <strong><i class="fas fa-check-circle"></i> Completed: ${d.toLocaleDateString()}</strong><br>
-                                <small>Due again: ${nextDueDate.toLocaleDateString()}</small>
-                            </div>
-                            `;
-                                } catch (e) {
-                                    return `
-                            <button class="btn btn-small" style="background:var(--primary);color:var(--white);border:none;transition:all 0.2s ease;" onclick="markService(${rowid}, this)">
-                                <i class="fas fa-check-circle"></i> Mark Serviced
-                            </button>
-                            `;
-                                }
-                            })()}
+                    <button class="btn btn-small" style="background: #635BFF; color: white; border: none;" onclick="openPaymentModal(${rowid}, '${c[0].replace(/'/g, "\\'")}')">
+                        <i class="fas fa-credit-card"></i> Pay
+                    </button>
                     <button class="btn btn-small btn-danger" onclick="deleteCustomer(${rowid})" style="background: #ef4444; border: none;">
                         <i class="fas fa-trash"></i> Delete
                     </button>
@@ -796,15 +1001,108 @@
                 </button>` : ""}
             </div>
         </div>
+        <div class="services-section" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #e2e8f0;">
+            <strong><i class="fas fa-concierge-bell"></i> Services & Pricing</strong>
+            <div style="display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.5rem;" id="services-${rowid}">
+                ${(() => {
+                    if (availableServices.length === 0) return '<span style="color: #9ca3af; font-size: 0.85rem;">No services available for this location</span>';
+                    const custServices = customerServices[rowid] || {};
+                    
+                    return availableServices.map(svc => {
+                        const isActive = custServices[svc.id]?.active || false;
+                        const price = custServices[svc.id]?.price || 0;
+                        const lastCompleted = custServices[svc.id]?.last_completed_date;
+                        
+                        // Calculate frequency days based on rounds for this service type
+                        // More rounds = fewer days between visits
+                        let roundsPerYear = 9; // default for chemical
+                        if (svc.service_type === 'mowing') {
+                            roundsPerYear = locationMowingRounds[c[17]] || 26;
+                        } else if (svc.service_type === 'chemical') {
+                            roundsPerYear = 9;
+                        } else {
+                            roundsPerYear = 12; // default monthly
+                        }
+                        const frequencyDays = Math.round(365 / roundsPerYear);
+                        
+                        // Calculate next due date - use TODAY as reference for isDue check
+                        let nextDueDate = null;
+                        let isDue = false;
+                        const today = new Date();
+                        today.setHours(0,0,0,0);
+                        
+                        if (lastCompleted && isActive) {
+                            const completed = new Date(lastCompleted);
+                            completed.setHours(0,0,0,0);
+                            nextDueDate = new Date(completed.getTime() + frequencyDays * 86400000);
+                            nextDueDate.setHours(0,0,0,0);
+                            isDue = today >= nextDueDate;
+                        } else if (isActive && !lastCompleted) {
+                            // Never completed = always due
+                            isDue = true;
+                        }
+                        
+                        const statusBg = isActive ? (isDue ? '#fef2f2' : '#f0fdf4') : '#f9fafb';
+                        const statusBorder = isActive ? (isDue ? '#fecaca' : '#bbf7d0') : '#e5e7eb';
+                        
+                        return `
+                            <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.5rem; background: ${statusBg}; border-radius: 6px; border: 1px solid ${statusBorder};">
+                                <div style="display: flex; align-items: center; gap: 0.75rem; flex: 1;">
+                                    <input type="checkbox" 
+                                           ${isActive ? 'checked' : ''} 
+                                           onchange="toggleService(${rowid}, ${svc.id}, this.checked)"
+                                           style="cursor: pointer; width: 18px; height: 18px;">
+                                    <div style="display: flex; flex-direction: column; gap: 0.15rem;">
+                                        <span style="font-weight: 500; font-size: 0.9rem;">${svc.name}</span>
+                                        ${isActive ? `
+                                            <span style="font-size: 0.75rem; color: #6b7280;">
+                                                ${lastCompleted ? `Completed: ${new Date(lastCompleted).toLocaleDateString()}` : 'Never completed'}
+                                                ${nextDueDate ? ` | Due: ${nextDueDate.toLocaleDateString()}` : ''}
+                                            </span>
+                                        ` : '<span style="font-size: 0.75rem; color: #9ca3af;">Not assigned</span>'}
+                                    </div>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <span style="font-size: 0.8rem; color: #6b7280;">$</span>
+                                    <input type="number" 
+                                           value="${price > 0 ? price : ''}" 
+                                           placeholder="0"
+                                           onchange="updateServicePrice(${rowid}, ${svc.id}, this.value)"
+                                           style="width: 60px; padding: 0.3rem; border: 1px solid #d1d5db; border-radius: 4px; font-size: 0.85rem;"
+                                           min="0" step="1"
+                                           title="Set price per visit">
+                                    <span style="font-size: 0.75rem; color: #9ca3af;">/visit</span>
+                                    ${isActive && isDue ? `
+                                        <button class="btn btn-small" 
+                                                style="background: var(--primary); color: white; border: none; font-size: 0.75rem; padding: 0.3rem 0.6rem; margin-left: 0.5rem; white-space: nowrap;" 
+                                                onclick="markServiceComplete(${rowid}, ${svc.id}, this)">
+                                            <i class="fas fa-check"></i> Mark Done
+                                        </button>
+                                    ` : isActive ? `
+                                        <span style="font-size: 0.75rem; color: #16a34a; margin-left: 0.5rem; white-space: nowrap;">
+                                            <i class="fas fa-clock"></i> Due: ${nextDueDate ? nextDueDate.toLocaleDateString() : 'Calculating...'}
+                                        </span>
+                                    ` : ''}
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                })()}
+            </div>
+        </div>
+        ${(() => {
+            // Only show grass type section if Chemical Application service is selected
+            const custServices = customerServices[rowid] || {};
+            const hasChemicalService = availableServices.some(s => s.service_type === 'chemical' && custServices[s.id]?.active);
+            if (!hasChemicalService) return '';
+            return `
         <div class="grass-type-section" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #e2e8f0;">
-            <strong><i class="fas fa-leaf"></i> Grass Type</strong>
+            <strong><i class="fas fa-leaf"></i> Grass Type (Chemical Service)</strong>
             <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem;">
                 ${(() => {
-                    console.log('Rendering grass types for', c[0], 'grassTypes:', grassTypes, 'customer grass_type_id:', c[15]);
-                    if (grassTypes.length === 0) return '<span style="color: #9ca3af; font-size: 0.85rem;">No grass types available for this location</span>';
+                    if (grassTypes.length === 0) return '<span style="color: #9ca3af; font-size: 0.85rem;">No grass types available</span>';
                     return grassTypes.map(gt => {
                         const isChecked = c[15] === gt.id;
-                        console.log('  Checkbox for', gt.name, 'id:', gt.id, 'checked:', isChecked);
                         return `
                             <label style="display: flex; align-items: center; gap: 0.25rem; padding: 0.25rem 0.5rem; background: ${isChecked ? '#dcfce7' : '#f3f4f6'}; border-radius: 6px; border: 1px solid ${isChecked ? '#16a34a' : '#e5e7eb'}; cursor: pointer; font-size: 0.85rem;">
                                 <input type="checkbox" ${isChecked ? 'checked' : ''} onchange="updateGrassType(${rowid}, ${gt.id}, this.checked)" style="cursor: pointer;">
@@ -816,6 +1114,8 @@
             </div>
             ${c[16] ? `<div style="margin-top: 0.5rem; font-size: 0.85rem; color: #16a34a;"><i class="fas fa-check"></i> Currently assigned: ${c[16]}</div>` : ''}
         </div>
+        `;
+        })()}
     </div>
 `;
                 });
@@ -875,33 +1175,6 @@
                     });
             }
 
-            function confirmPrice(rowid) {
-                const input = document.getElementById(`price-${rowid}`);
-                const price = parseFloat(input.value);
-
-                if (!price || price <= 0) {
-                    alert("Enter a valid price");
-                    return;
-                }
-
-                fetch("/update_actual_price", {
-                    method: "POST",
-                    body: new URLSearchParams({ rowid: rowid.toString(), actual_price: price })
-                })
-                    .then(res => {
-                        if (res.ok) {
-                            input.style.borderColor = "var(--primary)";
-                            setTimeout(() => fetchCustomers(), 800);
-                        } else {
-                            alert("Save failed. Try again.");
-                        }
-                    })
-                    .catch(e => {
-                        console.error("Save error:", e);
-                        alert("Save failed. Try again.");
-                    });
-            }
-
             async function updateGrassType(rowid, grassTypeId, isChecked) {
                 try {
                     const formData = new URLSearchParams({
@@ -930,13 +1203,11 @@
             document.getElementById("customerForm").addEventListener("submit", async (e) => {
                 e.preventDefault();
                 
-                // Check if there's a completed measurement to save
-                const hasMeasurement = measurePoints.length >= 3;
-                const measurementData = hasMeasurement ? JSON.stringify({
-                    points: measurePoints,
-                    timestamp: new Date().toISOString(),
-                    priceRange: document.getElementById('quoteResult').textContent
-                }) : null;
+                // Require at least one service to be selected
+                if (selectedServices.length === 0) {
+                    alert("Please select at least one service for the quote.");
+                    return;
+                }
                 
                 const name = document.getElementById("name").value;
                 const address = document.getElementById("address").value;
@@ -944,9 +1215,23 @@
                 const sqft = parseInt(document.getElementById("sqft").value) || currentSqft;
                 const notes = document.getElementById("notes").value;
                 
-                // Use calculated price range from measurement, or default calculation
-                const service_min = hasMeasurement ? currentPriceMin : sqft * 0.008;
-                const service_max = hasMeasurement ? currentPriceMax : sqft * 0.012;
+                // Calculate price based on selected services
+                let service_min, service_max;
+                if (selectedServices.length > 0 && sqft > 0) {
+                    let totalMin = 0;
+                    let totalMax = 0;
+                    selectedServices.forEach(serviceType => {
+                        const price = calculateServicePrice(sqft, serviceType);
+                        totalMin += price.min;
+                        totalMax += price.max;
+                    });
+                    service_min = totalMin;
+                    service_max = totalMax;
+                } else {
+                    // Fallback to default calculation
+                    service_min = sqft * 0.008;
+                    service_max = sqft * 0.012;
+                }
 
                 try {
                     // First, add the customer
@@ -959,38 +1244,84 @@
                         const result = await res.json();
                         const newCustomerId = result.rowid;
                         
-                        // If there's a measurement, save it for the new customer
-                        if (hasMeasurement && newCustomerId) {
-                            console.log('Auto-saving measurement for new customer:', newCustomerId);
-                            const formData = new FormData();
-                            formData.append('rowid', newCustomerId);
-                            formData.append('measurement_data', measurementData);
-                            formData.append('sqft', currentSqft);
-                            formData.append('monthly_min', currentPriceMin);
-                            formData.append('monthly_max', currentPriceMax);
+                        // Assign selected services to the new customer
+                        if (newCustomerId && selectedServices.length > 0) {
+                            // Ensure services are loaded
+                            if (availableServices.length === 0) {
+                                await loadServices();
+                            }
                             
-                            const saveRes = await fetch('/save_measurement', {
-                                method: 'POST',
-                                body: formData
-                            });
-                            
-                            const saveData = await saveRes.json();
-                            if (saveData.status === 'success') {
-                                console.log('Measurement auto-saved successfully');
-                            } else {
-                                console.error('Failed to auto-save measurement:', saveData.message);
+                            for (const serviceType of selectedServices) {
+                                try {
+                                    const svc = availableServices.find(s => s.service_type === serviceType);
+                                    if (svc && svc.id) {
+                                        const formData = new URLSearchParams();
+                                        formData.append('service_id', svc.id);
+                                        // Use agreed price if set, otherwise 0 (will need to be set later)
+                                        const agreedPrice = serviceAgreedPrices[serviceType] || 0;
+                                        formData.append('price', agreedPrice);
+                                        
+                                        const svcRes = await fetch(`/customers/${newCustomerId}/services`, {
+                                            method: "POST",
+                                            body: formData
+                                        });
+                                        
+                                        const svcData = await svcRes.json();
+                                        if (svcData.status !== 'success') {
+                                            console.error(`Failed to assign ${serviceType} service:`, svcData.message);
+                                        }
+                                    } else {
+                                        console.warn(`Service type '${serviceType}' not found in available services`);
+                                    }
+                                } catch (svcError) {
+                                    console.error(`Error assigning ${serviceType} service:`, svcError);
+                                    // Continue with other services - don't fail the whole operation
+                                }
                             }
                         }
                         
+                        // Check if there's a completed measurement to save
+                        const hasMeasurement = measurePoints.length >= 3;
+                        if (hasMeasurement && newCustomerId) {
+                            try {
+                                const measurementData = JSON.stringify({
+                                    points: measurePoints,
+                                    timestamp: new Date().toISOString(),
+                                    priceRange: document.getElementById('perimeterResult').textContent
+                                });
+                                
+                                const formData = new FormData();
+                                formData.append('rowid', newCustomerId);
+                                formData.append('measurement_data', measurementData);
+                                formData.append('sqft', currentSqft);
+                                formData.append('monthly_min', currentPriceMin);
+                                formData.append('monthly_max', currentPriceMax);
+                                
+                                await fetch('/save_measurement', {
+                                    method: 'POST',
+                                    body: formData
+                                });
+                            } catch (measError) {
+                                console.error('Error saving measurement:', measError);
+                                // Don't fail if measurement save fails
+                            }
+                        }
+                        
+                        // Reset form and state
                         document.getElementById("customerForm").reset();
+                        selectedServices = []; // Clear selected services
+                        renderNewCustomerServices(); // Re-render checkboxes
+                        updateNewCustomerQuote(); // Reset quote display
                         clearMeasurements();
                         fetchCustomers();
                     } else {
-                        alert("Failed to add customer.");
+                        const errorData = await res.json().catch(() => ({}));
+                        console.error("Add customer failed:", errorData);
+                        alert("Failed to add customer: " + (errorData.message || "Unknown error"));
                     }
                 } catch (e) {
                     console.error("Add error:", e);
-                    alert("Failed to add customer");
+                    alert("Failed to add customer: " + e.message);
                 }
             });
 
@@ -1038,6 +1369,43 @@
                     });
             }
 
+            async function markServiceComplete(rowid, serviceId, button) {
+                button.style.opacity = '0.7';
+                button.disabled = true;
+                
+                try {
+                    const res = await fetch("/mark_service", {
+                        method: "POST",
+                        body: new URLSearchParams({ 
+                            rowid: rowid.toString(),
+                            service_id: serviceId.toString()
+                        })
+                    });
+                    
+                    const data = await res.json();
+                    
+                    if (data.status === 'success') {
+                        // Show success message with charge info if available
+                        if (data.charge && data.charge.status === 'success') {
+                            alert(`Service marked complete! Auto-charged $${data.charge.amount} to customer's saved card.`);
+                        } else if (data.charge && data.charge.status === 'failed') {
+                            alert(`Service marked complete, but auto-charge failed: ${data.charge.error}`);
+                        } else {
+                            alert('Service marked complete!');
+                        }
+                        fetchCustomers();
+                    } else {
+                        alert("Failed to mark service: " + (data.message || "Unknown error"));
+                        button.style.opacity = '1';
+                        button.disabled = false;
+                    }
+                } catch (err) {
+                    alert("Failed: " + err);
+                    button.style.opacity = '1';
+                    button.disabled = false;
+                }
+            }
+
             // ========== MEASUREMENT TOOL ==========
             let measureMap = null;
             let measurePoints = [];
@@ -1060,6 +1428,169 @@
             let currentSqft = 0;
             let currentPriceMin = 0;
             let currentPriceMax = 0;
+            let selectedServices = []; // Track selected services for new customer
+
+            // Service pricing multipliers (relative to base chemical lawn price)
+            const SERVICE_MULTIPLIERS = {
+                'chemical': 1.0,      // Chemical Lawn Care - base price
+                'mowing': 0.75        // Mowing - 25% less than chemical
+            };
+
+            // Calculate price range for a service based on sqft
+            function calculateServicePrice(sqft, serviceType) {
+                const baseSmall = 3000;
+                const baseLarge = 10000;
+                const priceSmall = 50;
+                const priceLarge = 100;
+                
+                let pricePerTreatment;
+                if (sqft <= baseSmall) {
+                    pricePerTreatment = priceSmall;
+                } else if (sqft >= baseLarge) {
+                    pricePerTreatment = priceLarge * (sqft / baseLarge);
+                } else {
+                    const ratio = (sqft - baseSmall) / (baseLarge - baseSmall);
+                    pricePerTreatment = priceSmall + ratio * (priceLarge - priceSmall);
+                }
+                
+                // Apply service multiplier
+                const multiplier = SERVICE_MULTIPLIERS[serviceType] || 1.0;
+                const minPrice = Math.round(pricePerTreatment * 0.9 * multiplier);
+                const maxPrice = Math.round(pricePerTreatment * 1.1 * multiplier);
+                
+                return { min: minPrice, max: maxPrice };
+            }
+
+            // Store agreed price for each service (serviceType -> agreedPrice)
+            let serviceAgreedPrices = {};
+
+            // Update quote display based on selected services
+            function updateNewCustomerQuote() {
+                const sqft = parseInt(document.getElementById('sqft').value) || 0;
+                const quoteDisplay = document.getElementById('serviceQuoteDisplay');
+                const checkboxesDiv = document.getElementById('serviceCheckboxes');
+                
+                if (selectedServices.length === 0) {
+                    quoteDisplay.innerHTML = '<span style="color: var(--gray-500);">Select services to see estimated price range</span>';
+                    return;
+                }
+                
+                if (sqft === 0) {
+                    quoteDisplay.innerHTML = '<span style="color: var(--warning);">Enter square footage to calculate quote</span>';
+                    return;
+                }
+                
+                let serviceBreakdown = [];
+                
+                selectedServices.forEach(serviceType => {
+                    const price = calculateServicePrice(sqft, serviceType);
+                    const agreedPrice = serviceAgreedPrices[serviceType];
+                    
+                    const serviceName = serviceType === 'chemical' ? 'Chemical Lawn' : 
+                                       serviceType === 'mowing' ? 'Mowing' : serviceType;
+                    
+                    if (agreedPrice !== undefined) {
+                        // Show agreed price
+                        serviceBreakdown.push(`
+                            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
+                                <span style="font-weight: 500;">${serviceName}:</span>
+                                <span style="color: var(--success); font-weight: 600;">$${agreedPrice}/service</span>
+                                <button onclick="clearAgreedPrice('${serviceType}')" 
+                                        style="padding: 0.15rem 0.4rem; background: none; border: none; cursor: pointer; color: var(--gray-400); font-size: 0.7rem;"
+                                        title="Reset to range">↺</button>
+                            </div>
+                        `);
+                    } else {
+                        // Show range with input to set agreed price
+                        serviceBreakdown.push(`
+                            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
+                                <span style="font-weight: 500;">${serviceName}:</span>
+                                <span style="color: var(--gray-500);">$${price.min} - $${price.max}</span>
+                                <span style="color: var(--gray-400);">|</span>
+                                <span style="color: var(--gray-500); font-size: 0.7rem;">Agreed:</span>
+                                <input type="number" 
+                                       placeholder="$" 
+                                       onchange="setAgreedPrice('${serviceType}', this.value)"
+                                       style="width: 50px; padding: 0.2rem; border: 1px solid #d1d5db; border-radius: 4px; font-size: 0.75rem;"
+                                       title="Enter agreed price"
+                                       min="0" step="1">
+                            </div>
+                        `);
+                    }
+                });
+                
+                quoteDisplay.innerHTML = `
+                    <div style="font-size: 0.75rem; color: var(--gray-600);">
+                        ${serviceBreakdown.join('')}
+                    </div>
+                `;
+            }
+
+            // Set agreed price for a service
+            function setAgreedPrice(serviceType, value) {
+                const numValue = parseInt(value) || 0;
+                if (numValue > 0) {
+                    serviceAgreedPrices[serviceType] = numValue;
+                    updateNewCustomerQuote();
+                }
+            }
+
+            // Clear agreed price for a service (reset to range)
+            function clearAgreedPrice(serviceType) {
+                delete serviceAgreedPrices[serviceType];
+                updateNewCustomerQuote();
+            }
+
+            // Toggle service selection
+            function toggleNewCustomerService(serviceType, serviceName, isChecked) {
+                if (isChecked) {
+                    if (!selectedServices.includes(serviceType)) {
+                        selectedServices.push(serviceType);
+                    }
+                } else {
+                    selectedServices = selectedServices.filter(s => s !== serviceType);
+                }
+                updateNewCustomerQuote();
+            }
+
+            // Render service checkboxes for new customer
+            async function renderNewCustomerServices() {
+                const container = document.getElementById('serviceCheckboxes');
+                if (!container) return;
+                
+                // Load services if not already loaded
+                if (availableServices.length === 0) {
+                    await loadServices();
+                }
+                
+                if (availableServices.length === 0) {
+                    container.innerHTML = '<span style="color: var(--gray-500); font-size: 0.8rem;">No services available</span>';
+                    return;
+                }
+                
+                container.innerHTML = availableServices.map(svc => {
+                    const isChecked = selectedServices.includes(svc.service_type);
+                    const icon = svc.service_type === 'chemical' ? 'fa-flask' : 
+                                svc.service_type === 'mowing' ? 'fa-cut' : 'fa-bug';
+                    return `
+                        <label style="display: flex; align-items: center; gap: 0.35rem; padding: 0.4rem 0.6rem; background: ${isChecked ? '#dcfce7' : 'white'}; border: 1px solid ${isChecked ? '#16a34a' : '#e2e8f0'}; border-radius: 6px; cursor: pointer; font-size: 0.8rem; transition: all 0.2s;" onmouseover="this.style.borderColor='#3b82f6'" onmouseout="this.style.borderColor='${isChecked ? '#16a34a' : '#e2e8f0'}">
+                            <input type="checkbox" ${isChecked ? 'checked' : ''} onchange="toggleNewCustomerService('${svc.service_type}', '${svc.name}', this.checked)" style="cursor: pointer;">
+                            <i class="fas ${icon}" style="color: var(--primary);"></i>
+                            <span>${svc.name}</span>
+                        </label>
+                    `;
+                }).join('');
+            }
+
+            // Initialize services section on page load
+            document.addEventListener('DOMContentLoaded', function() {
+                renderNewCustomerServices();
+                
+                // Add listener for sqft changes
+                document.getElementById("sqft").addEventListener("input", function() {
+                    updateNewCustomerQuote();
+                });
+            });
 
             function measureCustomer(rowid, address) {
                 console.log('=== measureCustomer called ===');
@@ -1417,12 +1948,18 @@
                 currentPriceMin = Math.round(pricePerTreatment * 0.9);
                 currentPriceMax = Math.round(pricePerTreatment * 1.1);
 
+                // Convert perimeter from miles to feet
+                const perimeterFeet = Math.round(perimeter * 5280);
+
                 document.getElementById('areaResult').textContent = currentSqft.toLocaleString();
                 document.getElementById('acreResult').textContent = acres.toFixed(2);
-                document.getElementById('quoteResult').textContent = '$' + currentPriceMin.toFixed(0) + ' - $' + currentPriceMax.toFixed(0);
+                document.getElementById('perimeterResult').textContent = perimeterFeet.toLocaleString() + ' ft';
                 
                 // Auto-populate sqft in Add New Customer form
                 document.getElementById('sqft').value = currentSqft;
+                
+                // Update quote for new customer form
+                updateNewCustomerQuote();
             }
 
             function haversineDistance(lat1, lng1, lat2, lng2) {
@@ -1482,7 +2019,7 @@
                 if (measurePoints.length < 3) {
                     document.getElementById('areaResult').textContent = '0';
                     document.getElementById('acreResult').textContent = '0';
-                    document.getElementById('quoteResult').textContent = '$0 - $0';
+                    document.getElementById('perimeterResult').textContent = '0 ft';
                 }
             }
 
@@ -1522,7 +2059,7 @@
                 // Reset UI
                 document.getElementById('areaResult').textContent = '0';
                 document.getElementById('acreResult').textContent = '0';
-                document.getElementById('quoteResult').textContent = '$0 - $0';
+                document.getElementById('perimeterResult').textContent = '0 ft';
                 document.getElementById('removePointBtn').disabled = true;
                 document.getElementById('saveMeasurementBtn').style.display = 'none';
                 document.getElementById('measureAddress').value = '';
@@ -1628,7 +2165,198 @@
                     console.error('Load current user error:', e);
                 }
             }
+
+            // ========== STRIPE PAYMENT FUNCTIONS ==========
+            let stripe = null;
+            let cardElement = null;
+            let currentPaymentCustomerId = null;
+
+            async function loadStripeConfig() {
+                try {
+                    const res = await fetch('/stripe/config');
+                    const data = await res.json();
+                    if (data.status === 'success' && data.publishable_key) {
+                        stripe = Stripe(data.publishable_key);
+                        return true;
+                    }
+                    return false;
+                } catch (e) {
+                    console.error('Error loading Stripe config:', e);
+                    return false;
+                }
+            }
+
+            function openPaymentModal(customerId, customerName) {
+                currentPaymentCustomerId = customerId;
+                document.getElementById('paymentCustomerName').textContent = customerName;
+                document.getElementById('paymentError').style.display = 'none';
+                document.getElementById('paymentSuccess').style.display = 'none';
+                
+                const modal = document.getElementById('paymentModal');
+                modal.style.display = 'flex';
+                
+                // Initialize Stripe Elements
+                if (!stripe) {
+                    loadStripeConfig().then(loaded => {
+                        if (loaded) {
+                            initStripeElements();
+                        } else {
+                            document.getElementById('paymentError').textContent = 'Stripe not configured. Please set up Stripe in Admin > Payments.';
+                            document.getElementById('paymentError').style.display = 'block';
+                        }
+                    });
+                } else {
+                    initStripeElements();
+                }
+            }
+
+            function initStripeElements() {
+                const elements = stripe.elements();
+                
+                // Create card element with styling
+                const style = {
+                    base: {
+                        fontSize: '16px',
+                        color: '#1e293b',
+                        '::placeholder': {
+                            color: '#94a3b8',
+                        },
+                    },
+                    invalid: {
+                        color: '#dc2626',
+                    },
+                };
+                
+                if (cardElement) {
+                    cardElement.unmount();
+                }
+                
+                cardElement = elements.create('card', {style: style});
+                cardElement.mount('#card-element');
+                
+                // Handle validation errors
+                cardElement.on('change', function(event) {
+                    const displayError = document.getElementById('card-errors');
+                    if (event.error) {
+                        displayError.textContent = event.error.message;
+                    } else {
+                        displayError.textContent = '';
+                    }
+                });
+            }
+
+            function closePaymentModal() {
+                const modal = document.getElementById('paymentModal');
+                modal.style.display = 'none';
+                if (cardElement) {
+                    cardElement.unmount();
+                    cardElement = null;
+                }
+                currentPaymentCustomerId = null;
+            }
+
+            async function submitPayment() {
+                if (!stripe || !cardElement) {
+                    alert('Stripe not initialized');
+                    return;
+                }
+                
+                document.getElementById('paymentError').style.display = 'none';
+                document.getElementById('paymentSuccess').style.display = 'none';
+                
+                // Create payment method with Stripe
+                const {paymentMethod, error} = await stripe.createPaymentMethod({
+                    type: 'card',
+                    card: cardElement,
+                });
+                
+                if (error) {
+                    document.getElementById('paymentError').textContent = error.message;
+                    document.getElementById('paymentError').style.display = 'block';
+                    return;
+                }
+                
+                // Send to backend to save payment method
+                try {
+                    const formData = new FormData();
+                    formData.append('customer_id', currentPaymentCustomerId);
+                    formData.append('payment_method_id', paymentMethod.id);
+                    
+                    const res = await fetch('/stripe/save-payment-method', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    const data = await res.json();
+                    
+                    if (data.status === 'success') {
+                        document.getElementById('paymentSuccess').textContent = 'Payment method saved successfully! Customer will be automatically charged when services are completed.';
+                        document.getElementById('paymentSuccess').style.display = 'block';
+                        setTimeout(() => {
+                            closePaymentModal();
+                            loadCustomers(); // Refresh to show saved payment indicator
+                        }, 2000);
+                    } else {
+                        document.getElementById('paymentError').textContent = data.message || 'Failed to save payment method';
+                        document.getElementById('paymentError').style.display = 'block';
+                    }
+                } catch (e) {
+                    document.getElementById('paymentError').textContent = 'Network error. Please try again.';
+                    document.getElementById('paymentError').style.display = 'block';
+                }
+            }
         </script>
+
+        <!-- Payment Modal -->
+        <div id="paymentModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 10000; justify-content: center; align-items: center;">
+            <div style="background: white; border-radius: 12px; width: 90%; max-width: 500px; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);">
+                <!-- Modal Header -->
+                <div style="padding: 1.5rem; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center; background: linear-gradient(135deg, #635BFF, #0A2540);">
+                    <h2 style="margin: 0; color: white; font-size: 1.25rem;">
+                        <i class="fas fa-credit-card"></i> Save Payment Method
+                    </h2>
+                    <button onclick="closePaymentModal()" style="background: none; border: none; font-size: 1.5rem; color: white; cursor: pointer;">&times;</button>
+                </div>
+                
+                <!-- Modal Body -->
+                <div style="padding: 1.5rem;">
+                    <div style="margin-bottom: 1rem; padding: 0.75rem; background: #f0fdf4; border-radius: 8px; border-left: 4px solid #22c55e;">
+                        <strong>Customer:</strong> <span id="paymentCustomerName" style="color: #1e293b;"></span>
+                        <p style="margin: 0.5rem 0 0 0; font-size: 0.875rem; color: #166534;">
+                            <i class="fas fa-info-circle"></i> Enter card details to save for automatic billing when services are completed.
+                        </p>
+                    </div>
+                    
+                    <div style="margin-bottom: 1.5rem;">
+                        <label style="display: block; font-weight: 600; margin-bottom: 0.5rem; color: #1e293b;">
+                            <i class="fas fa-lock"></i> Card Information
+                        </label>
+                        <div style="padding: 1rem; border: 2px solid #e2e8f0; border-radius: 8px; background: white;">
+                            <div id="card-element" style="width: 100%;">
+                                <!-- Stripe Card Element will be mounted here -->
+                            </div>
+                            <div id="card-errors" style="color: #dc2626; font-size: 0.875rem; margin-top: 0.5rem;" role="alert"></div>
+                        </div>
+                        <p style="font-size: 0.75rem; color: #64748b; margin-top: 0.5rem;">
+                            <i class="fas fa-shield-alt"></i> Card data is securely handled by Stripe. Never stored on our servers.
+                        </p>
+                    </div>
+                    
+                    <div id="paymentError" style="display: none; padding: 0.75rem; background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; color: #dc2626; margin-bottom: 1rem;"></div>
+                    <div id="paymentSuccess" style="display: none; padding: 0.75rem; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; color: #166534; margin-bottom: 1rem;"></div>
+                </div>
+                
+                <!-- Modal Footer -->
+                <div style="padding: 1rem 1.5rem; border-top: 1px solid #e5e7eb; display: flex; justify-content: flex-end; gap: 0.75rem;">
+                    <button onclick="closePaymentModal()" style="padding: 0.5rem 1rem; border: 1px solid #d1d5db; border-radius: 6px; background: white; color: #374151; cursor: pointer; font-size: 0.9rem; font-weight: 500;">
+                        Cancel
+                    </button>
+                    <button onclick="submitPayment()" style="padding: 0.5rem 1.5rem; border: none; border-radius: 6px; background: linear-gradient(135deg, #635BFF, #0A2540); color: white; cursor: pointer; font-size: 0.9rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem;">
+                        <i class="fas fa-save"></i> Save Card
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 </body>
 </html>

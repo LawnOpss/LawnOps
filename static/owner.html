@@ -53,6 +53,31 @@
       line-height: 1.6;
     }
 
+    /* Condition code library scrollable list */
+    .cond-library-list {
+      max-height: 300px;
+      overflow-y: auto;
+      padding-right: 0.5rem;
+    }
+
+    .cond-library-list::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .cond-library-list::-webkit-scrollbar-track {
+      background: var(--gray-100);
+      border-radius: 3px;
+    }
+
+    .cond-library-list::-webkit-scrollbar-thumb {
+      background: var(--gray-400);
+      border-radius: 3px;
+    }
+
+    .cond-library-list::-webkit-scrollbar-thumb:hover {
+      background: var(--gray-500);
+    }
+
     /* NAVBAR */
     .navbar {
       background: var(--bg-light);
@@ -574,7 +599,30 @@
       font-weight: 600;
     }
 
-    /* SIDEBAR BOXES */
+    /* Chemical library scrollable list */
+    .chem-library-list {
+      max-height: 300px;
+      overflow-y: auto;
+      padding-right: 0.5rem;
+    }
+
+    .chem-library-list::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .chem-library-list::-webkit-scrollbar-track {
+      background: var(--gray-100);
+      border-radius: 3px;
+    }
+
+    .chem-library-list::-webkit-scrollbar-thumb {
+      background: var(--gray-400);
+      border-radius: 3px;
+    }
+
+    .chem-library-list::-webkit-scrollbar-thumb:hover {
+      background: var(--gray-500);
+    }
     .sidebar-box {
       background: var(--bg-light);
       border: 1px solid var(--border-color);
@@ -671,12 +719,54 @@
       margin-bottom: 1rem;
     }
 
+    /* TOGGLE SWITCH */
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 50px;
+      height: 26px;
+    }
+
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #ccc;
+      transition: .3s;
+      border-radius: 26px;
+    }
+
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 20px;
+      width: 20px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: .3s;
+      border-radius: 50%;
+    }
+
+    input:checked + .slider {
+      background-color: var(--primary);
+    }
+
+    input:checked + .slider:before {
+      transform: translateX(24px);
+    }
+
     /* RESPONSIVE */
     @media (max-width: 768px) {
-      .container {
-        padding: 1rem;
-      }
-
       .page-title {
         font-size: 1.5rem;
       }
@@ -765,13 +855,13 @@
     <!-- PAGE HEADER -->
     <div class="page-header">
       <h1 class="page-title"><i class="fas fa-cogs"></i> Administration</h1>
-      <p class="page-subtitle">Manage treatment plans, locations, and system configuration</p>
+      <p class="page-subtitle">Manage services, locations, and system configuration</p>
     </div>
 
     <!-- TABS -->
     <div class="tabs">
       <button id="tab-treatments" class="tab-btn active" data-tab="treatments">
-        <i class="fas fa-prescription-bottle"></i> Treatment Plans
+        <i class="fas fa-concierge-bell"></i> Services
       </button>
       <button id="tab-locations" class="tab-btn" data-tab="locations">
         <i class="fas fa-map-location-dot"></i> Locations
@@ -782,16 +872,19 @@
       <button id="tab-office" class="tab-btn" data-tab="office">
         <i class="fas fa-user-tie"></i> Office
       </button>
+      <button id="tab-payments" class="tab-btn" data-tab="payments">
+        <i class="fas fa-credit-card"></i> Payments
+      </button>
     </div>
 
-    <!-- ==================== TREATMENT PLANS TAB ==================== -->
+    <!-- ==================== SERVICES TAB ==================== -->
     <div id="treatments" class="tab-content active">
-      <!-- Location Selector for Treatment Plans -->
+      <!-- Location Selector for Services -->
       <div class="form-panel" style="background: var(--primary-light); border-color: var(--primary);">
         <h3><i class="fas fa-map-marker-alt"></i> Location Required</h3>
         <p style="color: var(--text-secondary); margin: 0 0 1rem 0; font-size: 0.9rem;">
-          Select a location to view or create location-specific treatment plans. 
-          <strong>All treatment plans must be associated with a location.</strong>
+          Select a location to view or create location-specific services. 
+          <strong>All services must be associated with a location.</strong>
         </p>
         <div class="form-row">
           <div class="form-group" style="flex: 1;">
@@ -807,46 +900,108 @@
         </div>
       </div>
 
-      <!-- Add Grass Type -->
-      <div class="form-panel">
-        <h3><i class="fas fa-leaf"></i> Add Grass Type</h3>
-        <div class="form-group">
-          <input type="text" id="grassTypeInput" class="form-input" placeholder="e.g. Bermuda, St. Augustine, Zoysia..." autocomplete="off" />
+      <!-- Services List Header with +Add Service -->
+      <div class="form-panel" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+        <div>
+          <h3><i class="fas fa-list"></i> Location Services</h3>
+          <p style="color: var(--text-secondary); margin: 0; font-size: 0.9rem;">Configure services offered at this location</p>
         </div>
-        <button id="addGrassTypeBtn" class="btn btn-primary">
-          <i class="fas fa-plus"></i> Add Grass Type
+        <button id="addServiceBtn" class="btn btn-primary" onclick="openServiceTypeModal()">
+          <i class="fas fa-plus"></i> Add Service
         </button>
-        <p id="selectedLocationInfo" style="color: var(--error); margin: 0.5rem 0 0 0; font-size: 0.85rem; font-style: italic;">
-          Please select a location above to add treatment plans
-        </p>
       </div>
+      
+      <!-- Services Container -->
+      <div id="servicesContainer" style="display: grid; gap: 1rem; margin-bottom: 2rem;"></div>
 
-      <div style="display: grid; grid-template-columns: 1fr 320px; gap: 2rem; align-items: start;">
-        <!-- Main treatments area -->
-        <div id="grassTypesContainer"></div>
-
-        <!-- Right sidebar -->
-        <div style="display: grid; gap: 1.5rem; position: sticky; top: 120px;">
-          <!-- Chemicals -->
-          <div class="sidebar-box">
-            <h3><i class="fas fa-flask"></i> Chemicals</h3>
-            <p>Global chemical library</p>
-            <div class="form-group">
-              <input type="text" id="chemAutoInput"  class="form-input" placeholder="Add chemical..." />
-            </div>
-            <ul class="item-list" id="chemAutoList"></ul>
+      <!-- Chemical Service Configuration (shows when chemical service exists) -->
+      <div id="chemicalServiceConfig" style="display: none;">
+        <!-- Dropdown: Add Grass Type -->
+        <div class="form-panel" style="margin-bottom: 1rem; padding: 0;">
+          <div onclick="toggleDropdown('addGrassDropdown')" style="padding: 1rem 1.5rem; cursor: pointer; display: flex; justify-content: space-between; align-items: center; background: var(--bg-secondary); border-radius: 8px;">
+            <h4 style="margin: 0; color: var(--text-primary);">
+              <i class="fas fa-plus-circle"></i> Add Grass Type
+            </h4>
+            <i class="fas fa-chevron-down" id="addGrassDropdown-icon" style="transition: transform 0.2s;"></i>
           </div>
-
-          <!-- Condition Codes -->
-          <div class="sidebar-box">
-            <h3><i class="fas fa-stethoscope"></i> Condition Codes</h3>
-            <p>Lawn condition diagnostics</p>
+          <div id="addGrassDropdown" style="display: none; padding: 1.5rem; border-top: 1px solid var(--border);">
             <div class="form-group">
-              <input type="text" id="condInput" class="form-input" placeholder="Add code..." />
+              <input type="text" id="grassTypeInput" class="form-input" placeholder="e.g. Bermuda, St. Augustine, Zoysia..." autocomplete="off" />
             </div>
-            <ul class="item-list" id="condList"></ul>
+            <button id="addGrassTypeBtn" class="btn btn-primary">
+              <i class="fas fa-plus"></i> Add Grass Type
+            </button>
+            <p id="selectedLocationInfo" style="color: var(--error); margin: 0.5rem 0 0 0; font-size: 0.85rem; font-style: italic;">
+              Please select a location above to add treatment plans
+            </p>
           </div>
         </div>
+
+        <!-- Dropdown: Grass Types and Rounds -->
+        <div class="form-panel" style="margin-bottom: 1rem; padding: 0;">
+          <div onclick="toggleDropdown('grassTypesDropdown')" style="padding: 1rem 1.5rem; cursor: pointer; display: flex; justify-content: space-between; align-items: center; background: var(--bg-secondary); border-radius: 8px;">
+            <h4 style="margin: 0; color: var(--text-primary);">
+              <i class="fas fa-leaf"></i> Grass Types and Rounds
+            </h4>
+            <i class="fas fa-chevron-down" id="grassTypesDropdown-icon" style="transition: transform 0.2s;"></i>
+          </div>
+          <div id="grassTypesDropdown" style="display: none; padding: 1.5rem; border-top: 1px solid var(--border);">
+            <div style="display: grid; grid-template-columns: 1fr 320px; gap: 2rem; align-items: start;">
+              <!-- Main treatments area -->
+              <div id="grassTypesContainer"></div>
+
+              <!-- Right sidebar -->
+              <div style="display: grid; gap: 1.5rem;">
+                <!-- Dropdown: Chemicals -->
+                <div class="sidebar-box" style="padding: 0;">
+                  <div onclick="toggleDropdown('chemicalsDropdown')" style="padding: 1rem; cursor: pointer; display: flex; justify-content: space-between; align-items: center; background: var(--bg-secondary); border-radius: 8px 8px 0 0;">
+                    <h4 style="margin: 0; color: var(--text-primary); font-size: 1rem;">
+                      <i class="fas fa-flask"></i> Chemicals
+                    </h4>
+                    <i class="fas fa-chevron-down" id="chemicalsDropdown-icon" style="transition: transform 0.2s;"></i>
+                  </div>
+                  <div id="chemicalsDropdown" style="display: none; padding: 1rem; border-top: 1px solid var(--border);">
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.75rem;">Global chemical library</p>
+                    <div class="form-group">
+                      <input type="text" id="chemAutoInput" class="form-input" placeholder="Add chemical..." />
+                    </div>
+                    <div class="form-group">
+                      <input type="text" id="chemSearchInput" class="form-input" placeholder="Search chemicals..." oninput="renderChemicalAutoList(this.value)" />
+                    </div>
+                    <ul class="item-list chem-library-list" id="chemAutoList" style="max-height: 200px; overflow-y: auto;"></ul>
+                  </div>
+                </div>
+
+                <!-- Dropdown: Condition Codes -->
+                <div class="sidebar-box" style="padding: 0;">
+                  <div onclick="toggleDropdown('conditionsDropdown')" style="padding: 1rem; cursor: pointer; display: flex; justify-content: space-between; align-items: center; background: var(--bg-secondary); border-radius: 8px 8px 0 0;">
+                    <h4 style="margin: 0; color: var(--text-primary); font-size: 1rem;">
+                      <i class="fas fa-stethoscope"></i> Condition Codes
+                    </h4>
+                    <i class="fas fa-chevron-down" id="conditionsDropdown-icon" style="transition: transform 0.2s;"></i>
+                  </div>
+                  <div id="conditionsDropdown" style="display: none; padding: 1rem; border-top: 1px solid var(--border);">
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.75rem;">Lawn condition diagnostics</p>
+                    <div class="form-group">
+                      <input type="text" id="condInput" class="form-input" placeholder="Add code..." />
+                    </div>
+                    <div class="form-group">
+                      <input type="text" id="condSearchInput" class="form-input" placeholder="Search condition codes..." oninput="renderConditionList(this.value)" />
+                    </div>
+                    <ul class="item-list cond-library-list" id="condList" style="max-height: 200px; overflow-y: auto;"></ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- No Services State -->
+      <div id="noServicesState" style="text-align: center; padding: 3rem; color: var(--text-secondary);">
+        <i class="fas fa-concierge-bell" style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.5;"></i>
+        <h3>No Services Configured</h3>
+        <p>Click "Add Service" above to set up your first service offering.</p>
       </div>
     </div>
 
@@ -932,6 +1087,25 @@
               <button id="addTechnicianBtn" class="btn btn-primary">
                 <i class="fas fa-plus"></i> Add Technician
               </button>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group" style="flex: 1;">
+              <label class="form-label">Assigned Services</label>
+              <div id="techServicesContainer" style="display: flex; gap: 1.5rem; flex-wrap: wrap; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-primary);">
+                <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                  <input type="checkbox" id="techServiceChemical" value="chemical" class="tech-service-checkbox" style="width: 18px; height: 18px; cursor: pointer;">
+                  <span><i class="fas fa-flask" style="color: #16a34a;"></i> Chemical Lawn</span>
+                </label>
+                <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                  <input type="checkbox" id="techServiceMowing" value="mowing" class="tech-service-checkbox" style="width: 18px; height: 18px; cursor: pointer;">
+                  <span><i class="fas fa-cut" style="color: #2563eb;"></i> Mowing</span>
+                </label>
+                <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                  <input type="checkbox" id="techServicePest" value="pest" class="tech-service-checkbox" style="width: 18px; height: 18px; cursor: pointer;">
+                  <span><i class="fas fa-bug" style="color: #d97706;"></i> Pest Control</span>
+                </label>
+              </div>
             </div>
           </div>
         </div>
@@ -1040,6 +1214,255 @@
       </div>
     </div>
 
+    <!-- ==================== PAYMENT PROCESSING TAB ==================== -->
+    <div id="payments" class="tab-content">
+      <div class="card">
+        <div class="section-header">
+          <h2 class="section-title"><i class="fas fa-credit-card"></i> Payment Processing</h2>
+        </div>
+        <p style="color: var(--text-secondary); margin: 0 0 1.5rem 0;">Configure third-party payment processors for company-wide use. All locations will use these same payment settings. All API credentials are encrypted and stored securely.</p>
+
+        <!-- Payment Processors Grid -->
+        <div id="paymentProcessorsContainer" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 1.5rem;">
+          
+          <!-- Stripe Card -->
+          <div class="form-panel" style="border-left: 4px solid #635BFF;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+              <div style="display: flex; align-items: center; gap: 0.75rem;">
+                <div style="width: 40px; height: 40px; background: #635BFF; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+                  <i class="fab fa-stripe" style="color: white; font-size: 1.5rem;"></i>
+                </div>
+                <div>
+                  <div style="font-weight: 700; color: var(--text-primary);">Stripe</div>
+                  <div style="font-size: 0.85rem; color: var(--text-secondary);">Credit Cards, ACH, Buy Now Pay Later</div>
+                </div>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="stripeEnabled" onchange="toggleProcessor('stripe')">
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div id="stripeConfig" style="display: none;">
+              <div class="form-group">
+                <label class="form-label">Publishable Key</label>
+                <input type="text" id="stripePublishableKey" class="form-input" placeholder="pk_live_..." />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Secret Key</label>
+                <input type="password" id="stripeSecretKey" class="form-input" placeholder="sk_live_..." />
+                <small style="color: var(--text-secondary);">Stored encrypted. Only used server-side.</small>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Webhook Secret</label>
+                <input type="password" id="stripeWebhookSecret" class="form-input" placeholder="whsec_..." />
+              </div>
+              <div class="form-row" style="margin-top: 1rem;">
+                <div class="form-group">
+                  <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                    <input type="checkbox" id="stripeTestMode" style="width: 18px; height: 18px;">
+                    <span>Test Mode (Sandbox)</span>
+                  </label>
+                </div>
+                <div class="form-group" style="display: flex; justify-content: flex-end;">
+                  <button class="btn btn-primary" onclick="saveProcessorConfig('stripe')">
+                    <i class="fas fa-save"></i> Save Stripe Config
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Square Card -->
+          <div class="form-panel" style="border-left: 4px solid #00C853;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+              <div style="display: flex; align-items: center; gap: 0.75rem;">
+                <div style="width: 40px; height: 40px; background: #00C853; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+                  <i class="fas fa-square" style="color: white; font-size: 1.2rem;"></i>
+                </div>
+                <div>
+                  <div style="font-weight: 700; color: var(--text-primary);">Square</div>
+                  <div style="font-size: 0.85rem; color: var(--text-secondary);">In-person & Online Payments</div>
+                </div>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="squareEnabled" onchange="toggleProcessor('square')">
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div id="squareConfig" style="display: none;">
+              <div class="form-group">
+                <label class="form-label">Application ID</label>
+                <input type="text" id="squareAppId" class="form-input" placeholder="sq0idp-..." />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Access Token</label>
+                <input type="password" id="squareAccessToken" class="form-input" placeholder="sq0atp-..." />
+                <small style="color: var(--text-secondary);">Stored encrypted. Only used server-side.</small>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Location ID</label>
+                <input type="text" id="squareLocationId" class="form-input" placeholder="L..." />
+              </div>
+              <div class="form-row" style="margin-top: 1rem;">
+                <div class="form-group">
+                  <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                    <input type="checkbox" id="squareTestMode" style="width: 18px; height: 18px;">
+                    <span>Sandbox Mode</span>
+                  </label>
+                </div>
+                <div class="form-group" style="display: flex; justify-content: flex-end;">
+                  <button class="btn btn-primary" onclick="saveProcessorConfig('square')">
+                    <i class="fas fa-save"></i> Save Square Config
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- PayPal Card -->
+          <div class="form-panel" style="border-left: 4px solid #003087;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+              <div style="display: flex; align-items: center; gap: 0.75rem;">
+                <div style="width: 40px; height: 40px; background: #003087; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+                  <i class="fab fa-paypal" style="color: white; font-size: 1.5rem;"></i>
+                </div>
+                <div>
+                  <div style="font-weight: 700; color: var(--text-primary);">PayPal</div>
+                  <div style="font-size: 0.85rem; color: var(--text-secondary);">PayPal, Venmo, Pay Later</div>
+                </div>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="paypalEnabled" onchange="toggleProcessor('paypal')">
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div id="paypalConfig" style="display: none;">
+              <div class="form-group">
+                <label class="form-label">Client ID</label>
+                <input type="text" id="paypalClientId" class="form-input" placeholder="AZ..." />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Client Secret</label>
+                <input type="password" id="paypalClientSecret" class="form-input" placeholder="EJ..." />
+                <small style="color: var(--text-secondary);">Stored encrypted. Only used server-side.</small>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Merchant ID</label>
+                <input type="text" id="paypalMerchantId" class="form-input" placeholder="Optional - for multi-account" />
+              </div>
+              <div class="form-row" style="margin-top: 1rem;">
+                <div class="form-group">
+                  <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                    <input type="checkbox" id="paypalTestMode" style="width: 18px; height: 18px;">
+                    <span>Sandbox Mode</span>
+                  </label>
+                </div>
+                <div class="form-group" style="display: flex; justify-content: flex-end;">
+                  <button class="btn btn-primary" onclick="saveProcessorConfig('paypal')">
+                    <i class="fas fa-save"></i> Save PayPal Config
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Webhook Info Panel -->
+        <div class="form-panel" style="margin-top: 2rem; background: #f0f9ff; border-color: #0ea5e9;">
+          <h3><i class="fas fa-webhook" style="color: #0ea5e9;"></i> Webhook Configuration</h3>
+          <p style="color: var(--text-secondary); margin: 0.5rem 0 1rem 0; font-size: 0.9rem;">
+            Use this webhook URL in your payment processor dashboard to receive payment notifications.
+          </p>
+          <div class="form-group">
+            <label class="form-label">Your Webhook Endpoint</label>
+            <div style="display: flex; gap: 0.5rem;">
+              <input type="text" id="webhookUrl" class="form-input" value="https://your-domain.com/api/webhooks/payments" readonly style="background: var(--bg-secondary); font-family: monospace;" />
+              <button class="btn btn-secondary" onclick="copyWebhookUrl()">
+                <i class="fas fa-copy"></i> Copy
+              </button>
+            </div>
+          </div>
+          <div style="margin-top: 1rem; padding: 1rem; background: white; border-radius: 8px; border: 1px solid var(--border-color);">
+            <h4 style="margin: 0 0 0.5rem 0; font-size: 0.9rem;">Supported Events:</h4>
+            <ul style="margin: 0; padding-left: 1.5rem; font-size: 0.85rem; color: var(--text-secondary);">
+              <li><code>payment_intent.succeeded</code> - Payment completed successfully</li>
+              <li><code>invoice.payment_succeeded</code> - Subscription/invoice paid</li>
+              <li><code>charge.refunded</code> - Refund processed</li>
+              <li><code>payment.failed</code> - Payment attempt failed</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Payment Methods Status -->
+        <div style="margin-top: 2rem;">
+          <h3 style="margin-bottom: 1rem; color: var(--text-primary);">
+            <i class="fas fa-list-check"></i> Active Payment Methods
+          </h3>
+          <div id="activePaymentMethods" style="display: grid; gap: 0.75rem;">
+            <div style="padding: 1rem; background: var(--bg-secondary); border-radius: 8px; color: var(--text-secondary); text-align: center;">
+              <i class="fas fa-spinner fa-spin"></i> Loading payment methods...
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Service Type Selector Modal -->
+    <div id="serviceTypeModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 10000; justify-content: center; align-items: center;">
+      <div style="background: white; border-radius: 12px; width: 90%; max-width: 500px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);">
+        <!-- Modal Header -->
+        <div style="padding: 1.5rem; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center;">
+          <h2 style="margin: 0; color: #1f2937; font-size: 1.25rem;">
+            <i class="fas fa-plus-circle"></i> Add New Service
+          </h2>
+          <button onclick="closeServiceTypeModal()" style="background: none; border: none; font-size: 1.5rem; color: #6b7280; cursor: pointer;">&times;</button>
+        </div>
+        
+        <!-- Modal Body -->
+        <div style="padding: 1.5rem;">
+          <p style="color: #6b7280; margin: 0 0 1rem 0; font-size: 0.9rem;">Select the type of service you want to add:</p>
+          
+          <div style="display: grid; gap: 0.75rem;">
+            <button onclick="selectServiceType('chemical')" class="service-type-btn" style="display: flex; align-items: center; gap: 1rem; padding: 1rem; border: 2px solid #e5e7eb; border-radius: 8px; background: white; cursor: pointer; transition: all 0.2s; text-align: left;">
+              <div style="width: 48px; height: 48px; background: #dcfce7; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+                <i class="fas fa-flask" style="font-size: 1.25rem; color: #16a34a;"></i>
+              </div>
+              <div>
+                <div style="font-weight: 600; color: #1f2937;">Chemical Lawn Care</div>
+                <div style="font-size: 0.85rem; color: #6b7280;">Fertilization, weed control, pest management</div>
+              </div>
+            </button>
+            
+            <button onclick="selectServiceType('pest')" class="service-type-btn" style="display: flex; align-items: center; gap: 1rem; padding: 1rem; border: 2px solid #e5e7eb; border-radius: 8px; background: white; cursor: pointer; transition: all 0.2s; text-align: left;">
+              <div style="width: 48px; height: 48px; background: #fef3c7; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+                <i class="fas fa-bug" style="font-size: 1.25rem; color: #d97706;"></i>
+              </div>
+              <div>
+                <div style="font-weight: 600; color: #1f2937;">Pest Control</div>
+                <div style="font-size: 0.85rem; color: #6b7280;">Insect and rodent control treatments</div>
+              </div>
+            </button>
+            
+            <button onclick="selectServiceType('mowing')" class="service-type-btn" style="display: flex; align-items: center; gap: 1rem; padding: 1rem; border: 2px solid #e5e7eb; border-radius: 8px; background: white; cursor: pointer; transition: all 0.2s; text-align: left;">
+              <div style="width: 48px; height: 48px; background: #dbeafe; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+                <i class="fas fa-cut" style="font-size: 1.25rem; color: #2563eb;"></i>
+              </div>
+              <div>
+                <div style="font-weight: 600; color: #1f2937;">Mowing Services</div>
+                <div style="font-size: 0.85rem; color: #6b7280;">Lawn cutting and maintenance</div>
+              </div>
+            </button>
+          </div>
+        </div>
+        
+        <!-- Modal Footer -->
+        <div style="padding: 1rem 1.5rem; border-top: 1px solid #e5e7eb; display: flex; justify-content: flex-end;">
+          <button onclick="closeServiceTypeModal()" style="padding: 0.5rem 1rem; border: 1px solid #d1d5db; border-radius: 6px; background: white; color: #374151; cursor: pointer; font-size: 0.9rem;">Cancel</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Territory Drawing Modal -->
     <div id="territoryModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10000; justify-content: center; align-items: center;">
       <div style="background: white; border-radius: 12px; width: 90%; max-width: 1200px; height: 85%; display: flex; flex-direction: column; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);">
@@ -1069,6 +1492,30 @@
           </div>
         </div>
         
+        <!-- Layer Visibility Controls -->
+        <div style="padding: 0.5rem 1rem; border-bottom: 1px solid #e5e7eb; display: flex; gap: 1.5rem; align-items: center; flex-wrap: wrap; background: #f9fafb;">
+          <span style="font-weight: 600; color: #374151; font-size: 0.9rem;"><i class="fas fa-layer-group"></i> View Layer:</span>
+          <label style="display: flex; align-items: center; gap: 0.35rem; cursor: pointer; font-size: 0.85rem;">
+            <input type="radio" name="territoryLayer" value="all" checked style="cursor: pointer;" onchange="switchTerritoryLayer('all')">
+            <span style="color: #374151;"><i class="fas fa-globe"></i> All</span>
+          </label>
+          <label style="display: flex; align-items: center; gap: 0.35rem; cursor: pointer; font-size: 0.85rem;">
+            <input type="radio" name="territoryLayer" value="chemical" style="cursor: pointer;" onchange="switchTerritoryLayer('chemical')">
+            <span style="color: #16a34a;"><i class="fas fa-flask"></i> Chemical</span>
+          </label>
+          <label style="display: flex; align-items: center; gap: 0.35rem; cursor: pointer; font-size: 0.85rem;">
+            <input type="radio" name="territoryLayer" value="mowing" style="cursor: pointer;" onchange="switchTerritoryLayer('mowing')">
+            <span style="color: #2563eb;"><i class="fas fa-cut"></i> Mowing</span>
+          </label>
+          <label style="display: flex; align-items: center; gap: 0.35rem; cursor: pointer; font-size: 0.85rem;">
+            <input type="radio" name="territoryLayer" value="pest" style="cursor: pointer;" onchange="switchTerritoryLayer('pest')">
+            <span style="color: #d97706;"><i class="fas fa-bug"></i> Pest</span>
+          </label>
+          <div style="margin-left: auto; font-size: 0.8rem; color: #6b7280;">
+            <i class="fas fa-info-circle"></i> Only one territory layer shown at a time
+          </div>
+        </div>
+        
         <!-- Map Container -->
         <div style="flex: 1; position: relative;">
           <div id="territoryMap" style="width: 100%; height: 100%; border-radius: 0 0 12px 12px;"></div>
@@ -1089,9 +1536,428 @@
       grassTypes: [],
       conditionCodes: [],
       chemicalAutos: [],
+      mowingServices: [],
       condCodeIds: {},  // "code_name" -> id
-      chemAutoIds: {}   // "chemical_name" -> id
+      chemAutoIds: {},  // "chemical_name" -> id
+      mowingServiceIds: {}  // "service_name" -> id
     };
+
+    // Services management
+    let services = [];
+
+    // ============ SERVICE TYPE MODAL FUNCTIONS ============
+    function openServiceTypeModal() {
+      const locationFilter = document.getElementById("treatmentPlanLocationFilter");
+      if (!locationFilter || !locationFilter.value) {
+        alert("Please select a location first");
+        return;
+      }
+      const modal = document.getElementById("serviceTypeModal");
+      modal.style.display = "flex";
+    }
+
+    function closeServiceTypeModal() {
+      const modal = document.getElementById("serviceTypeModal");
+      modal.style.display = "none";
+    }
+
+    async function selectServiceType(serviceType) {
+      const locationFilter = document.getElementById("treatmentPlanLocationFilter");
+      const locationId = locationFilter ? locationFilter.value : "";
+      
+      if (!locationId) {
+        alert("Please select a location first");
+        return;
+      }
+
+      // Service names and descriptions
+      const serviceNames = {
+        'chemical': 'Chemical Lawn Care',
+        'pest': 'Pest Control',
+        'mowing': 'Mowing Services'
+      };
+
+      const name = serviceNames[serviceType] || serviceType;
+      
+      try {
+        const formData = new FormData();
+        formData.append("name", name);
+        formData.append("service_type", serviceType);
+        formData.append("location_id", locationId);
+        formData.append("config_json", "{}");
+
+        const res = await fetch(`${API_BASE}/services`, {
+          method: "POST",
+          body: formData
+        });
+        
+        const data = await res.json();
+        if (data.status === "success") {
+          closeServiceTypeModal();
+          await loadServices();
+          // If chemical service was added, reload treatment plans too
+          if (serviceType === 'chemical') {
+            await loadAllData();
+          }
+        } else {
+          alert("Error: " + (data.message || "Failed to create service"));
+        }
+      } catch (e) {
+        console.error("Create service error:", e);
+        alert("Failed to create service");
+      }
+    }
+
+    async function loadServices() {
+      try {
+        const locationFilter = document.getElementById("treatmentPlanLocationFilter");
+        const locationId = locationFilter ? locationFilter.value : "";
+        
+        if (!locationId) {
+          services = [];
+          renderServices();
+          return;
+        }
+
+        const res = await fetch(`${API_BASE}/services?location_id=${locationId}`);
+        const data = await res.json();
+        
+        if (data.status === "success") {
+          services = data.services || [];
+          renderServices();
+          // Load mowing rounds if mowing service exists
+          const hasMowingService = services.some(s => s.service_type === 'mowing');
+          if (hasMowingService) {
+            await loadMowingRounds();
+          }
+        }
+      } catch (e) {
+        console.error("Load services error:", e);
+        services = [];
+        renderServices();
+      }
+    }
+
+    function renderServices() {
+      const container = document.getElementById("servicesContainer");
+      const noState = document.getElementById("noServicesState");
+      const chemicalConfig = document.getElementById("chemicalServiceConfig");
+      
+      if (!container || !noState) return;
+
+      if (services.length === 0) {
+        container.innerHTML = "";
+        noState.style.display = "block";
+        if (chemicalConfig) chemicalConfig.style.display = "none";
+        return;
+      }
+
+      noState.style.display = "none";
+      
+      // Hide the separate chemical config container since we're nesting it now
+      if (chemicalConfig) {
+        chemicalConfig.style.display = "none";
+      }
+
+      // Render service cards
+      container.innerHTML = services.map(svc => {
+        const iconMap = {
+          'chemical': 'fa-flask',
+          'pest': 'fa-bug',
+          'mowing': 'fa-cut'
+        };
+        const icon = iconMap[svc.service_type] || 'fa-concierge-bell';
+        
+        // For chemical service, nest the dropdown boxes inside
+        const chemicalDropdowns = svc.service_type === 'chemical' ? `
+          <div style="margin-top: 1rem; border-top: 1px solid var(--border-color); padding-top: 1rem;">
+            <!-- Dropdown: Add Grass Type -->
+            <div class="form-panel" style="margin-bottom: 1rem; padding: 0;">
+              <div onclick="toggleDropdown('addGrassDropdown')" style="padding: 1rem 1.5rem; cursor: pointer; display: flex; justify-content: space-between; align-items: center; background: var(--bg-secondary); border-radius: 8px;">
+                <h4 style="margin: 0; color: var(--text-primary);">
+                  <i class="fas fa-plus-circle"></i> Add Grass Type
+                </h4>
+                <i class="fas fa-chevron-down" id="addGrassDropdown-icon" style="transition: transform 0.2s;"></i>
+              </div>
+              <div id="addGrassDropdown" style="display: none; padding: 1.5rem; border-top: 1px solid var(--border);">
+                <div class="form-group">
+                  <input type="text" id="grassTypeInput" class="form-input" placeholder="e.g. Bermuda, St. Augustine, Zoysia..." autocomplete="off" />
+                </div>
+                <button id="addGrassTypeBtn" class="btn btn-primary">
+                  <i class="fas fa-plus"></i> Add Grass Type
+                </button>
+                <p id="selectedLocationInfo" style="color: var(--error); margin: 0.5rem 0 0 0; font-size: 0.85rem; font-style: italic;">
+                  Please select a location above to add treatment plans
+                </p>
+              </div>
+            </div>
+
+            <!-- Dropdown: Grass Types and Rounds -->
+            <div class="form-panel" style="margin-bottom: 1rem; padding: 0;">
+              <div onclick="toggleDropdown('grassTypesDropdown')" style="padding: 1rem 1.5rem; cursor: pointer; display: flex; justify-content: space-between; align-items: center; background: var(--bg-secondary); border-radius: 8px;">
+                <h4 style="margin: 0; color: var(--text-primary);">
+                  <i class="fas fa-leaf"></i> Grass Types and Rounds
+                </h4>
+                <i class="fas fa-chevron-down" id="grassTypesDropdown-icon" style="transition: transform 0.2s;"></i>
+              </div>
+              <div id="grassTypesDropdown" style="display: none; padding: 1.5rem; border-top: 1px solid var(--border);">
+                <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem; font-style: italic;">
+                  <i class="fas fa-info-circle"></i> Treatments are spaced by 365 ÷ number of rounds 
+                  <span style="color: var(--text-muted);">(e.g., 9 rounds = treatment every ~41 days)</span>
+                </p>
+                <div style="display: grid; grid-template-columns: 1fr 320px; gap: 2rem; align-items: start;">
+                  <!-- Main treatments area -->
+                  <div id="grassTypesContainer"></div>
+
+                  <!-- Right sidebar -->
+                  <div style="display: grid; gap: 1.5rem;">
+                    <!-- Dropdown: Chemicals -->
+                    <div class="sidebar-box" style="padding: 0;">
+                      <div onclick="toggleDropdown('chemicalsDropdown')" style="padding: 1rem; cursor: pointer; display: flex; justify-content: space-between; align-items: center; background: var(--bg-secondary); border-radius: 8px 8px 0 0;">
+                        <h4 style="margin: 0; color: var(--text-primary); font-size: 1rem;">
+                          <i class="fas fa-flask"></i> Chemicals
+                        </h4>
+                        <i class="fas fa-chevron-down" id="chemicalsDropdown-icon" style="transition: transform 0.2s;"></i>
+                      </div>
+                      <div id="chemicalsDropdown" style="display: none; padding: 1rem; border-top: 1px solid var(--border);">
+                        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.75rem;">Global chemical library</p>
+                        <div class="form-group">
+                          <input type="text" id="chemAutoInput" class="form-input" placeholder="Add chemical..." />
+                        </div>
+                        <div class="form-group">
+                          <input type="text" id="chemSearchInput" class="form-input" placeholder="Search chemicals..." oninput="renderChemicalAutoList(this.value)" />
+                        </div>
+                        <ul class="item-list chem-library-list" id="chemAutoList" style="max-height: 200px; overflow-y: auto;"></ul>
+                      </div>
+                    </div>
+
+                    <!-- Dropdown: Condition Codes -->
+                    <div class="sidebar-box" style="padding: 0;">
+                      <div onclick="toggleDropdown('conditionsDropdown')" style="padding: 1rem; cursor: pointer; display: flex; justify-content: space-between; align-items: center; background: var(--bg-secondary); border-radius: 8px 8px 0 0;">
+                        <h4 style="margin: 0; color: var(--text-primary); font-size: 1rem;">
+                          <i class="fas fa-stethoscope"></i> Condition Codes
+                        </h4>
+                        <i class="fas fa-chevron-down" id="conditionsDropdown-icon" style="transition: transform 0.2s;"></i>
+                      </div>
+                      <div id="conditionsDropdown" style="display: none; padding: 1rem; border-top: 1px solid var(--border);">
+                        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.75rem;">Lawn condition diagnostics</p>
+                        <div class="form-group">
+                          <input type="text" id="condInput" class="form-input" placeholder="Add code..." />
+                        </div>
+                        <div class="form-group">
+                          <input type="text" id="condSearchInput" class="form-input" placeholder="Search condition codes..." oninput="renderConditionList(this.value)" />
+                        </div>
+                        <ul class="item-list cond-library-list" id="condList" style="max-height: 200px; overflow-y: auto;"></ul>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        ` : '';
+
+        // For mowing service, add a simple rounds dropdown (no grass types)
+        const mowingDropdowns = svc.service_type === 'mowing' ? `
+          <div style="margin-top: 1rem; border-top: 1px solid var(--border-color); padding-top: 1rem;">
+            <!-- Dropdown: Mowing Services -->
+            <div class="form-panel" style="margin-bottom: 1rem; padding: 0;">
+              <div onclick="toggleDropdown('mowingServicesDropdown')" style="padding: 1rem 1.5rem; cursor: pointer; display: flex; justify-content: space-between; align-items: center; background: var(--bg-secondary); border-radius: 8px;">
+                <h4 style="margin: 0; color: var(--text-primary);">
+                  <i class="fas fa-cut"></i> Mowing Services
+                </h4>
+                <i class="fas fa-chevron-down" id="mowingServicesDropdown-icon" style="transition: transform 0.2s;"></i>
+              </div>
+              <div id="mowingServicesDropdown" style="display: none; padding: 1.5rem; border-top: 1px solid var(--border);">
+                <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem; font-style: italic;">
+                  <i class="fas fa-info-circle"></i> Mowing rounds are spaced by 365 ÷ number of rounds 
+                  <span style="color: var(--text-muted);">(e.g., 26 rounds = mowing every ~14 days)</span>
+                </p>
+                <div style="display: grid; grid-template-columns: 1fr 320px; gap: 2rem; align-items: start;">
+                  <!-- Main mowing rounds area -->
+                  <div id="mowingRoundsContainer" style="width: 100%;">
+                    <div class="grass-type-section" style="max-width: none;">
+                      <div class="grass-type-header">
+                        <div class="grass-type-name"><i class="fas fa-cut"></i> Mowing Schedule</div>
+                      </div>
+                      <button class="btn btn-primary" onclick="addMowingRound()" style="margin-bottom: 0.75rem; padding: 0.4rem 0.75rem; font-size: 0.85rem;">
+                        <i class="fas fa-plus"></i> Add Round
+                      </button>
+                      <div id="mowingRoundsList" style="width: 100%;"></div>
+                    </div>
+                  </div>
+
+                  <!-- Right sidebar -->
+                  <div style="display: grid; gap: 1.5rem;">
+                    <!-- Dropdown: Condition Codes -->
+                    <div class="sidebar-box" style="padding: 0;">
+                      <div onclick="toggleDropdown('mowingCondDropdown')" style="padding: 1rem; cursor: pointer; display: flex; justify-content: space-between; align-items: center; background: var(--bg-secondary); border-radius: 8px 8px 0 0;">
+                        <h4 style="margin: 0; color: var(--text-primary); font-size: 1rem;">
+                          <i class="fas fa-stethoscope"></i> Condition Codes
+                        </h4>
+                        <i class="fas fa-chevron-down" id="mowingCondDropdown-icon" style="transition: transform 0.2s;"></i>
+                      </div>
+                      <div id="mowingCondDropdown" style="display: none; padding: 1rem; border-top: 1px solid var(--border);">
+                        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.75rem;">Lawn condition diagnostics</p>
+                        <div class="form-group">
+                          <input type="text" id="mowingCondInput" class="form-input" placeholder="Add code..." />
+                        </div>
+                        <div class="form-group">
+                          <input type="text" id="mowingCondSearchInput" class="form-input" placeholder="Search condition codes..." oninput="renderMowingCondList(this.value)" />
+                        </div>
+                        <ul class="item-list cond-library-list" id="mowingCondList" style="max-height: 200px; overflow-y: auto;"></ul>
+                      </div>
+                    </div>
+
+                    <!-- Dropdown: Mowing Services -->
+                    <div class="sidebar-box" style="padding: 0;">
+                      <div onclick="toggleDropdown('mowingServicesLibDropdown')" style="padding: 1rem; cursor: pointer; display: flex; justify-content: space-between; align-items: center; background: var(--bg-secondary); border-radius: 8px 8px 0 0;">
+                        <h4 style="margin: 0; color: var(--text-primary); font-size: 1rem;">
+                          <i class="fas fa-cut"></i> Mowing Services
+                        </h4>
+                        <i class="fas fa-chevron-down" id="mowingServicesLibDropdown-icon" style="transition: transform 0.2s;"></i>
+                      </div>
+                      <div id="mowingServicesLibDropdown" style="display: none; padding: 1rem; border-top: 1px solid var(--border);">
+                        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.75rem;">Global mowing service library</p>
+                        <div class="form-group">
+                          <input type="text" id="mowingServiceInput" class="form-input" placeholder="Add mowing service..." />
+                        </div>
+                        <div class="form-group">
+                          <input type="text" id="mowingServiceSearchInput" class="form-input" placeholder="Search mowing services..." oninput="renderMowingServiceList(this.value)" />
+                        </div>
+                        <ul class="item-list mowing-service-library-list" id="mowingServiceList" style="max-height: 200px; overflow-y: auto;"></ul>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        ` : '';
+        
+        return `
+          <div class="form-panel" style="margin-bottom: 0.75rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div style="display: flex; align-items: center; gap: 1rem;">
+                <div style="width: 40px; height: 40px; background: var(--primary-light); border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+                  <i class="fas ${icon}" style="color: var(--primary);"></i>
+                </div>
+                <div>
+                  <div style="font-weight: 600; color: var(--text-primary);">${svc.name}</div>
+                  <div style="font-size: 0.85rem; color: var(--text-secondary);">${svc.service_type} service</div>
+                </div>
+              </div>
+              <button class="btn btn-sm btn-danger" onclick="deleteService(${svc.id})">
+                <i class="fas fa-trash"></i>
+              </button>
+            </div>
+            ${chemicalDropdowns}
+            ${mowingDropdowns}
+          </div>
+        `;
+      }).join('');
+      
+      // Re-attach event listeners for the add grass type button
+      const addGrassBtn = document.getElementById("addGrassTypeBtn");
+      if (addGrassBtn) {
+        addGrassBtn.addEventListener("click", async () => {
+          const input = document.getElementById("grassTypeInput");
+          const v = input.value.trim();
+          if (!v) return;
+          if (await createGrassType(v)) {
+            input.value = "";
+          }
+        });
+      }
+      
+      const grassTypeInput = document.getElementById("grassTypeInput");
+      if (grassTypeInput) {
+        grassTypeInput.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") {
+            const btn = document.getElementById("addGrassTypeBtn");
+            if (btn) btn.click();
+          }
+        });
+      }
+      
+      // Re-attach event listeners for condition codes and chemicals
+      const condInput = document.getElementById("condInput");
+      if (condInput) {
+        condInput.addEventListener("keydown", async (e) => {
+          if (e.key !== "Enter") return;
+          const v = e.target.value.trim();
+          if (!v) return;
+          if (await addConditionCode(v)) {
+            e.target.value = "";
+          }
+        });
+      }
+      
+      const chemAutoInput = document.getElementById("chemAutoInput");
+      if (chemAutoInput) {
+        chemAutoInput.addEventListener("keydown", async (e) => {
+          if (e.key !== "Enter") return;
+          const v = e.target.value.trim();
+          if (!v) return;
+          if (await addChemicalAuto(v)) {
+            e.target.value = "";
+          }
+        });
+      }
+
+      // Re-attach event listeners for mowing section inputs
+      const mowingCondInput = document.getElementById("mowingCondInput");
+      if (mowingCondInput) {
+        mowingCondInput.addEventListener("keydown", async (e) => {
+          if (e.key !== "Enter") return;
+          const v = e.target.value.trim();
+          if (!v) return;
+          if (await addConditionCode(v)) {
+            e.target.value = "";
+          }
+        });
+      }
+
+      const mowingServiceInput = document.getElementById("mowingServiceInput");
+      if (mowingServiceInput) {
+        mowingServiceInput.addEventListener("keydown", async (e) => {
+          if (e.key !== "Enter") return;
+          const v = e.target.value.trim();
+          if (!v) return;
+          if (await addMowingServiceToDB(v)) {
+            e.target.value = "";
+          }
+        });
+      }
+      
+      // Now that the HTML structure exists, populate the grass types
+      if (config.grassTypes.length > 0) {
+        renderAll();
+      }
+    }
+
+    async function deleteService(serviceId) {
+      if (!confirm("Delete this service? This will remove it from all customers.")) {
+        return;
+      }
+      
+      try {
+        const res = await fetch(`${API_BASE}/services/${serviceId}`, {
+          method: "DELETE"
+        });
+        
+        const data = await res.json();
+        if (data.status === "success") {
+          await loadServices();
+          await loadAllData(); // Refresh treatment plans if chemical was deleted
+        } else {
+          alert("Error: " + (data.message || "Failed to delete service"));
+        }
+      } catch (e) {
+        console.error("Delete service error:", e);
+        alert("Failed to delete service");
+      }
+    }
 
     // Location filtering variables
     let currentUserLocationId = null;
@@ -1133,6 +1999,12 @@
         config.chemAutoIds = {};
         globalData.chemicalAutos.forEach(c => {
           config.chemAutoIds[c.name] = c.id;
+        });
+        
+        config.mowingServices = globalData.mowingServices.map(s => s.name);
+        config.mowingServiceIds = {};
+        globalData.mowingServices.forEach(s => {
+          config.mowingServiceIds[s.name] = s.id;
         });
 
         renderAll();
@@ -1369,28 +2241,179 @@
       return false;
     }
 
-    // ============ RENDERING ============
-    function renderConditionList() {
-      const list = document.getElementById("condList");
+    // ============ MOWING SERVICES FUNCTIONS ============
+    async function addMowingServiceToDB(serviceName) {
+      const formData = new FormData();
+      formData.append("service_name", serviceName);
+      try {
+        const res = await fetch(`${API_BASE}/mowing-services`, {
+          method: "POST",
+          body: formData
+        });
+        const data = await res.json();
+        if (data.status === "success") {
+          await loadAllData();
+          await loadMowingRounds(); // Refresh rounds to show new service in dropdowns
+          return true;
+        } else {
+          alert("Error: " + data.message);
+          return false;
+        }
+      } catch (e) {
+        console.error("Add mowing service error:", e);
+      }
+      return false;
+    }
+
+    async function deleteMowingServiceFromDB(serviceId) {
+      try {
+        const res = await fetch(`${API_BASE}/mowing-services/${serviceId}`, {
+          method: "DELETE"
+        });
+        const data = await res.json();
+        if (data.status === "success") {
+          await loadAllData();
+          await loadMowingRounds(); // Refresh rounds to remove deleted service from dropdowns
+          return true;
+        }
+      } catch (e) {
+        console.error("Delete mowing service error:", e);
+      }
+      return false;
+    }
+
+    function renderMowingCondList(filter = "") {
+      const list = document.getElementById("mowingCondList");
+      if (!list) return;
       list.innerHTML = "";
-      config.conditionCodes.forEach((code, idx) => {
+      
+      const filteredCodes = config.conditionCodes.filter(code => 
+        code.toLowerCase().includes(filter.toLowerCase())
+      );
+      
+      if (filteredCodes.length === 0 && filter) {
+        list.innerHTML = `<li style="color: var(--text-secondary); font-style: italic; justify-content: center;">No condition codes found</li>`;
+        return;
+      }
+      
+      filteredCodes.forEach((code, idx) => {
         const li = document.createElement("li");
         li.innerHTML = `
           <span>${code}</span>
-          <button class="btn btn-sm btn-danger" onclick="deleteConditionCodeUI(${idx})"><i class="fas fa-trash"></i></button>
+          <button class="btn btn-sm btn-danger" onclick="deleteMowingCondCodeUI(${config.conditionCodes.indexOf(code)})"><i class="fas fa-trash"></i></button>
         `;
         list.appendChild(li);
       });
     }
 
-    function renderChemicalAutoList() {
+    function deleteMowingCondCodeUI(idx) {
+      const code = config.conditionCodes[idx];
+      if (confirm(`Delete condition code "${code}"?`)) {
+        const codeId = config.condCodeIds[code];
+        if (codeId !== undefined) {
+          deleteConditionCodeFromDB(codeId);
+        } else {
+          console.error("Code ID not found for:", code);
+        }
+      }
+    }
+
+    function renderMowingServiceList(filter = "") {
+      const list = document.getElementById("mowingServiceList");
+      if (!list) return;
+      list.innerHTML = "";
+      
+      const filteredServices = config.mowingServices.filter(svc => 
+        svc.toLowerCase().includes(filter.toLowerCase())
+      );
+      
+      if (filteredServices.length === 0 && filter) {
+        list.innerHTML = `<li style="color: var(--text-secondary); font-style: italic; justify-content: center;">No mowing services found</li>`;
+        return;
+      }
+      
+      filteredServices.forEach((svc, idx) => {
+        const li = document.createElement("li");
+        li.innerHTML = `
+          <span>${svc}</span>
+          <button class="btn btn-sm btn-danger" onclick="deleteMowingServiceUI(${config.mowingServices.indexOf(svc)})"><i class="fas fa-trash"></i></button>
+        `;
+        list.appendChild(li);
+      });
+    }
+
+    function deleteMowingServiceUI(idx) {
+      const svc = config.mowingServices[idx];
+      if (confirm(`Delete mowing service "${svc}"?`)) {
+        const svcId = config.mowingServiceIds[svc];
+        if (svcId !== undefined) {
+          deleteMowingServiceFromDB(svcId);
+        } else {
+          console.error("Service ID not found for:", svc);
+        }
+      }
+    }
+
+    // ============ DROPDOWN TOGGLE FUNCTION ============
+    function toggleDropdown(dropdownId) {
+      const dropdown = document.getElementById(dropdownId);
+      const icon = document.getElementById(dropdownId + '-icon');
+      
+      if (!dropdown) return;
+      
+      const isOpen = dropdown.style.display === 'block';
+      
+      // Toggle visibility
+      dropdown.style.display = isOpen ? 'none' : 'block';
+      
+      // Rotate chevron icon
+      if (icon) {
+        icon.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(180deg)';
+      }
+    }
+
+    // ============ RENDERING ============
+    function renderConditionList(filter = "") {
+      const list = document.getElementById("condList");
+      list.innerHTML = "";
+      
+      const filteredCodes = config.conditionCodes.filter(code => 
+        code.toLowerCase().includes(filter.toLowerCase())
+      );
+      
+      if (filteredCodes.length === 0 && filter) {
+        list.innerHTML = `<li style="color: var(--text-secondary); font-style: italic; justify-content: center;">No condition codes found</li>`;
+        return;
+      }
+      
+      filteredCodes.forEach((code, idx) => {
+        const li = document.createElement("li");
+        li.innerHTML = `
+          <span>${code}</span>
+          <button class="btn btn-sm btn-danger" onclick="deleteConditionCodeUI(${config.conditionCodes.indexOf(code)})"><i class="fas fa-trash"></i></button>
+        `;
+        list.appendChild(li);
+      });
+    }
+
+    function renderChemicalAutoList(filter = "") {
       const list = document.getElementById("chemAutoList");
       list.innerHTML = "";
-      config.chemicalAutos.forEach((chem, idx) => {
+      
+      const filteredChems = config.chemicalAutos.filter(chem => 
+        chem.toLowerCase().includes(filter.toLowerCase())
+      );
+      
+      if (filteredChems.length === 0 && filter) {
+        list.innerHTML = `<li style="color: var(--text-secondary); font-style: italic; justify-content: center;">No chemicals found</li>`;
+        return;
+      }
+      
+      filteredChems.forEach((chem, idx) => {
         const li = document.createElement("li");
         li.innerHTML = `
           <span>${chem}</span>
-          <button class="btn btn-sm btn-danger" onclick="deleteChemicalAutoUI(${idx})"><i class="fas fa-trash"></i></button>
+          <button class="btn btn-sm btn-danger" onclick="deleteChemicalAutoUI(${config.chemicalAutos.indexOf(chem)})"><i class="fas fa-trash"></i></button>
         `;
         list.appendChild(li);
       });
@@ -1460,6 +2483,161 @@
       });
       renderConditionList();
       renderChemicalAutoList();
+      renderMowingCondList();
+      renderMowingServiceList();
+    }
+
+    // ============ MOWING ROUNDS MANAGEMENT ============
+    let mowingRounds = [];
+
+    async function loadMowingRounds() {
+      try {
+        const locationFilter = document.getElementById("treatmentPlanLocationFilter");
+        const locationId = locationFilter ? locationFilter.value : "";
+        
+        if (!locationId) {
+          mowingRounds = [];
+          renderMowingRounds();
+          return;
+        }
+
+        // Fetch mowing rounds for this location
+        const res = await fetch(`${API_BASE}/mowing-rounds?location_id=${locationId}`);
+        const data = await res.json();
+        
+        if (data.status === "success") {
+          mowingRounds = data.rounds || [];
+          renderMowingRounds();
+        }
+      } catch (e) {
+        console.error("Load mowing rounds error:", e);
+        mowingRounds = [];
+        renderMowingRounds();
+      }
+    }
+
+    function renderMowingRounds() {
+      const container = document.getElementById("mowingRoundsList");
+      if (!container) return;
+
+      if (mowingRounds.length === 0) {
+        container.innerHTML = '<p style="color: var(--text-secondary); font-style: italic;">No rounds added yet. Click "Add Round" to create mowing schedule.</p>';
+        return;
+      }
+
+      // Use grid layout for compact display - fits more rounds
+      const roundsHtml = `
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 0.5rem; width: 100%;">
+          ${mowingRounds.map((round, idx) => `
+            <div class="mowing-round-box" data-round-id="${round.id}" style="
+              background: var(--bg-secondary); 
+              border: 1px solid var(--border); 
+              border-radius: 6px; 
+              padding: 0.5rem;
+              font-size: 0.75rem;
+            ">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+                <span style="font-weight: 600; color: var(--text-primary);">R${idx + 1}</span>
+                <button class="btn btn-sm btn-danger" onclick="deleteMowingRound(${round.id})" style="
+                  padding: 0.15rem 0.3rem; 
+                  font-size: 0.65rem;
+                  line-height: 1;
+                "><i class="fas fa-times"></i></button>
+              </div>
+              <select class="form-input" 
+                      onchange="updateMowingRoundNote(${round.id}, this.value)"
+                      data-round-id="${round.id}"
+                      style="
+                        width: 100%;
+                        padding: 0.25rem 0.4rem;
+                        font-size: 0.7rem;
+                        border-radius: 4px;
+                        border: 1px solid var(--border);
+                        background: var(--bg-primary);
+                        color: var(--text-primary);
+                      ">
+                <option value="" ${!round.notes ? 'selected' : ''}>-- Select Service --</option>
+                ${config.mowingServices.map(svc => `<option value="${svc}" ${round.notes === svc ? 'selected' : ''}>${svc}</option>`).join('')}
+                <option value="${round.notes || ''}" ${round.notes && !config.mowingServices.includes(round.notes) ? 'selected' : ''}>${round.notes || 'Custom...'}</option>
+              </select>
+            </div>
+          `).join('')}
+        </div>
+      `;
+
+      container.innerHTML = roundsHtml;
+    }
+
+    async function addMowingRound() {
+      try {
+        const locationFilter = document.getElementById("treatmentPlanLocationFilter");
+        const locationId = locationFilter ? locationFilter.value : "";
+        
+        if (!locationId) {
+          alert("Please select a location first");
+          return;
+        }
+
+        const formData = new FormData();
+        formData.append("location_id", locationId);
+        formData.append("round_number", mowingRounds.length + 1);
+
+        const res = await fetch(`${API_BASE}/mowing-rounds`, {
+          method: "POST",
+          body: formData
+        });
+        
+        const data = await res.json();
+        if (data.status === "success") {
+          await loadMowingRounds();
+        } else {
+          alert("Error: " + (data.message || "Failed to add mowing round"));
+        }
+      } catch (e) {
+        console.error("Add mowing round error:", e);
+        alert("Failed to add mowing round");
+      }
+    }
+
+    async function deleteMowingRound(roundId) {
+      if (!confirm("Delete this mowing round?")) {
+        return;
+      }
+      
+      try {
+        const res = await fetch(`${API_BASE}/mowing-rounds/${roundId}`, {
+          method: "DELETE"
+        });
+        
+        const data = await res.json();
+        if (data.status === "success") {
+          await loadMowingRounds();
+        } else {
+          alert("Error: " + (data.message || "Failed to delete mowing round"));
+        }
+      } catch (e) {
+        console.error("Delete mowing round error:", e);
+        alert("Failed to delete mowing round");
+      }
+    }
+
+    async function updateMowingRoundNote(roundId, note) {
+      try {
+        const formData = new FormData();
+        formData.append("notes", note);
+
+        const res = await fetch(`${API_BASE}/mowing-rounds/${roundId}`, {
+          method: "PUT",
+          body: formData
+        });
+        
+        const data = await res.json();
+        if (data.status !== "success") {
+          console.error("Error updating mowing round:", data.message);
+        }
+      } catch (e) {
+        console.error("Update mowing round error:", e);
+      }
     }
 
     // ============ EVENT HANDLERS (UI) ============
@@ -1570,6 +2748,8 @@
     // ============ TREATMENT PLAN LOCATION FILTER ============
     document.getElementById("treatmentPlanLocationFilter")?.addEventListener("change", async () => {
       await loadAllData();
+      await loadServices();
+      await loadMowingRounds();
       updateLocationInfoText();
     });
 
@@ -1724,6 +2904,7 @@
         const data = await res.json();
         locations = data.locations || [];
         renderLocationsList();
+        populateLocationSelects();
       } catch (e) {
         console.error("Load locations error:", e);
       }
@@ -1850,12 +3031,27 @@ async function deleteLocationFromDB(locId) {
   }
 }
 
+    let availableServices = [];
+
     // ============ TECHNICIANS MANAGEMENT ============
     async function loadTechnicians() {
       try {
+        // Load available services first
+        const servicesRes = await fetch(`${API_BASE}/services`);
+        const servicesData = await servicesRes.json();
+        availableServices = servicesData.services || [];
+        
+        // Load technicians
         const res = await fetch(`${API_BASE}/technicians`);
         const data = await res.json();
         technicians = data.technicians || [];
+        
+        // Fetch services for each technician
+        for (const tech of technicians) {
+          const techServicesRes = await fetch(`${API_BASE}/technicians/${tech.id}/services`);
+          const techServicesData = await techServicesRes.json();
+          tech.services = techServicesData.services || [];
+        }
         
         // Apply both location and search filters
         filterTechnicians();
@@ -1863,6 +3059,98 @@ async function deleteLocationFromDB(locId) {
         populateLocationSelects();
       } catch (e) {
         console.error("Load technicians error:", e);
+      }
+    }
+
+    async function addTechnician() {
+      const name = document.getElementById("newTechName").value.trim();
+      const locationId = document.getElementById("newTechLocation").value;
+      const colorHex = document.getElementById("newTechColor").value;
+      
+      // Get selected services
+      const services = [];
+      if (document.getElementById("techServiceChemical").checked) {
+        services.push({ service_type: "chemical", name: "Chemical Lawn Care" });
+      }
+      if (document.getElementById("techServiceMowing").checked) {
+        services.push({ service_type: "mowing", name: "Mowing Services" });
+      }
+      if (document.getElementById("techServicePest").checked) {
+        services.push({ service_type: "pest", name: "Pest Control" });
+      }
+
+      if (!name || !locationId) {
+        alert("Technician name and location are required");
+        return;
+      }
+
+      if (services.length === 0) {
+        alert("At least one service must be assigned to the technician");
+        return;
+      }
+
+      try {
+        const formData = new FormData();
+        formData.append("name", name);
+        formData.append("location_id", locationId);
+        formData.append("color_hex", colorHex);
+
+        const res = await fetch(`${API_BASE}/technicians`, {
+          method: "POST",
+          body: formData
+        });
+        const data = await res.json();
+
+        if (data.status === "success") {
+          // If technician was created and services were selected, assign them
+          if (data.technician_id && services.length > 0) {
+            const assignedServices = [];
+            for (const service of services) {
+              // Look up the service_id from availableServices
+              const serviceObj = availableServices.find(s => s.service_type === service.service_type);
+              if (!serviceObj) {
+                console.error(`Service type '${service.service_type}' not found in available services`);
+                continue;
+              }
+              const serviceFormData = new FormData();
+              serviceFormData.append("service_id", serviceObj.id);
+              const res = await fetch(`${API_BASE}/technicians/${data.technician_id}/services`, {
+                method: "POST",
+                body: serviceFormData
+              });
+              const result = await res.json();
+              if (result.status !== "success") {
+                console.error(`Failed to assign service:`, result.message);
+              } else {
+                // Add to assigned services list for immediate display
+                assignedServices.push({
+                  service_type: service.service_type,
+                  name: service.name
+                });
+              }
+            }
+            // Add the new technician with services to the local array immediately
+            if (data.technician) {
+              data.technician.services = assignedServices;
+              technicians.unshift(data.technician);
+            }
+          }
+          
+          // Clear form
+          document.getElementById("newTechName").value = "";
+          document.getElementById("newTechLocation").value = "";
+          document.getElementById("newTechColor").value = "#3b82f6";
+          document.getElementById("techServiceChemical").checked = false;
+          document.getElementById("techServiceMowing").checked = false;
+          document.getElementById("techServicePest").checked = false;
+          
+          await loadTechnicians();
+        } else {
+          alert("Error: " + (data.message || "Failed to add technician"));
+        }
+      } catch (e) {
+        console.error("Add technician error:", e);
+        alert("Failed to add technician");
       }
     }
 
@@ -1901,7 +3189,27 @@ async function deleteLocationFromDB(locId) {
         return;
       }
 
-      container.innerHTML = displayList.map(tech => `
+      container.innerHTML = displayList.map(tech => {
+        // Build service badges HTML
+        let serviceBadges = '';
+        if (tech.services && tech.services.length > 0) {
+          const iconMap = {
+            'chemical': 'fa-flask',
+            'mowing': 'fa-cut',
+            'pest': 'fa-bug'
+          };
+          const colorMap = {
+            'chemical': '#16a34a',
+            'mowing': '#2563eb',
+            'pest': '#d97706'
+          };
+          serviceBadges = `<div class="location-detail" style="margin-top: 0.5rem;">
+            <strong>Services:</strong> 
+            ${tech.services.map(s => `<span style="display: inline-flex; align-items: center; gap: 0.25rem; background: rgba(0,0,0,0.05); padding: 0.2rem 0.5rem; border-radius: 4px; margin-right: 0.5rem; font-size: 0.85rem;"><i class="fas ${iconMap[s.service_type] || 'fa-wrench'}" style="color: ${colorMap[s.service_type] || '#666'};"></i> ${s.name}</span>`).join('')}
+          </div>`;
+        }
+        
+        return `
         <div class="location-card">
           <div class="location-info">
             <div class="location-name" style="display: flex; align-items: center; gap: 0.5rem;">
@@ -1912,6 +3220,7 @@ async function deleteLocationFromDB(locId) {
             <div class="location-detail"><strong>Office Location:</strong> ${tech.location_name}</div>
             <div class="location-detail"><strong>Address:</strong> ${tech.location_address}</div>
             <div class="location-detail"><strong>Profile Color:</strong> <span style="display: inline-block; width: 12px; height: 12px; background: ${tech.color_hex}; border-radius: 2px; vertical-align: middle;"></span> ${tech.color_hex}</div>
+            ${serviceBadges}
           </div>
           <div class="location-actions">
             <button onclick="toggleTechnicianStatus(${tech.id})" class="btn btn-secondary" style="font-size: 0.8rem;">
@@ -1925,10 +3234,10 @@ async function deleteLocationFromDB(locId) {
             </button>
           </div>
         </div>
-      `).join('');
+      `}).join('');
     }
 
-    function populateLocationSelects() {
+    async function populateLocationSelects() {
       const selects = ['newTechLocation', 'territoryLocation'];
       selects.forEach(selectId => {
         const select = document.getElementById(selectId);
@@ -1969,7 +3278,9 @@ async function deleteLocationFromDB(locId) {
         } else if (locations.length > 0) {
           treatmentPlanFilterSelect.value = locations[0].id;
           // Load data for auto-selected location
-          loadAllData();
+          await loadAllData();
+          await loadServices();
+          await loadMowingRounds();
           updateLocationInfoText();
         }
       }
@@ -2006,43 +3317,6 @@ async function deleteLocationFromDB(locId) {
       }
     }
 
-    async function addTechnician() {
-      const name = document.getElementById("newTechName").value.trim();
-      const locationId = document.getElementById("newTechLocation").value;
-      const colorHex = document.getElementById("newTechColor").value;
-
-      if (!name || !locationId) {
-        alert("Please fill in all required fields");
-        return;
-      }
-
-      const formData = new FormData();
-      formData.append("name", name);
-      formData.append("location_id", locationId);
-      formData.append("color_hex", colorHex);
-
-      try {
-        const res = await fetch(`${API_BASE}/technicians`, {
-          method: "POST",
-          body: formData
-        });
-        const data = await res.json();
-
-        if (data.status === "success") {
-          document.getElementById("newTechName").value = "";
-          document.getElementById("newTechLocation").value = "";
-          document.getElementById("newTechColor").value = "#3b82f6";
-          await loadTechnicians();
-          alert(data.message);
-        } else {
-          alert("Error: " + data.message);
-        }
-      } catch (e) {
-        console.error("Add technician error:", e);
-        alert("Failed to add technician");
-      }
-    }
-
     async function toggleTechnicianStatus(techId) {
       const tech = technicians.find(t => t.id === techId);
       if (!tech) return;
@@ -2068,24 +3342,124 @@ async function deleteLocationFromDB(locId) {
       }
     }
 
+    let currentEditTechId = null;
+
     function editTechnician(techId) {
       const tech = technicians.find(t => t.id === techId);
       if (!tech) return;
 
-      const name = prompt("Technician name:", tech.name);
-      if (name === null) return;
+      currentEditTechId = techId;
 
-      const formData = new FormData();
-      if (name !== tech.name) formData.append("name", name);
+      // Populate the modal fields
+      document.getElementById('editTechName').value = tech.name;
+      document.getElementById('editTechColor').value = tech.color_hex || '#3b82f6';
 
-      // You could add more fields here for editing
+      // Populate location dropdown
+      const locationSelect = document.getElementById('editTechLocation');
+      locationSelect.innerHTML = '<option value="">Select location...</option>';
+      locations.forEach(loc => {
+        const option = document.createElement('option');
+        option.value = loc.id;
+        option.textContent = loc.name;
+        locationSelect.appendChild(option);
+      });
+      locationSelect.value = tech.location_id;
 
-      if (formData.entries().next().done) {
-        alert("No changes made");
+      // Set checkboxes based on current services
+      const serviceTypes = tech.services ? tech.services.map(s => s.service_type) : [];
+      document.getElementById('editTechServiceChemical').checked = serviceTypes.includes('chemical');
+      document.getElementById('editTechServiceMowing').checked = serviceTypes.includes('mowing');
+      document.getElementById('editTechServicePest').checked = serviceTypes.includes('pest');
+
+      // Show the modal
+      document.getElementById('editTechnicianModal').style.display = 'flex';
+    }
+
+    function closeEditTechnicianModal() {
+      document.getElementById('editTechnicianModal').style.display = 'none';
+      currentEditTechId = null;
+    }
+
+    async function saveEditTechnician() {
+      if (!currentEditTechId) return;
+
+      const tech = technicians.find(t => t.id === currentEditTechId);
+      if (!tech) return;
+
+      const name = document.getElementById('editTechName').value.trim();
+      const locationId = document.getElementById('editTechLocation').value;
+      const colorHex = document.getElementById('editTechColor').value;
+
+      if (!name || !locationId) {
+        alert('Please fill in all required fields');
         return;
       }
 
-      updateTechnician(techId, formData);
+      try {
+        // Update basic technician info
+        const formData = new FormData();
+        if (name !== tech.name) formData.append('name', name);
+        if (locationId != tech.location_id) formData.append('location_id', locationId);
+        if (colorHex !== tech.color_hex) formData.append('color_hex', colorHex);
+
+        if (formData.entries().next().done === false) {
+          const res = await fetch(`${API_BASE}/technicians/${currentEditTechId}`, {
+            method: 'PUT',
+            body: formData
+          });
+          const data = await res.json();
+          if (data.status !== 'success') {
+            alert('Error updating technician: ' + data.message);
+            return;
+          }
+        }
+
+        // Get current services
+        const currentServiceTypes = tech.services ? tech.services.map(s => s.service_type) : [];
+
+        // Get selected services from checkboxes
+        const selectedServices = [];
+        if (document.getElementById('editTechServiceChemical').checked) selectedServices.push('chemical');
+        if (document.getElementById('editTechServiceMowing').checked) selectedServices.push('mowing');
+        if (document.getElementById('editTechServicePest').checked) selectedServices.push('pest');
+
+        // Remove services that are no longer selected
+        for (const serviceType of currentServiceTypes) {
+          if (!selectedServices.includes(serviceType)) {
+            const service = availableServices.find(s => s.service_type === serviceType && s.location_id == locationId);
+            if (service) {
+              await fetch(`${API_BASE}/technicians/${currentEditTechId}/services/${service.id}`, {
+                method: 'DELETE'
+              });
+            }
+          }
+        }
+
+        // Add newly selected services - filter by technician's location
+        for (const serviceType of selectedServices) {
+          if (!currentServiceTypes.includes(serviceType)) {
+            // Find service of this type at the technician's location
+            const service = availableServices.find(s => s.service_type === serviceType && s.location_id == locationId);
+            if (service) {
+              const serviceFormData = new FormData();
+              serviceFormData.append('service_id', service.id);
+              await fetch(`${API_BASE}/technicians/${currentEditTechId}/services`, {
+                method: 'POST',
+                body: serviceFormData
+              });
+            } else {
+              console.warn(`No ${serviceType} service found at location ${locationId}`);
+            }
+          }
+        }
+
+        closeEditTechnicianModal();
+        await loadTechnicians();
+        alert('Technician updated successfully');
+      } catch (e) {
+        console.error('Save edit technician error:', e);
+        alert('Failed to update technician');
+      }
     }
 
     async function updateTechnician(techId, formData) {
@@ -2235,16 +3609,24 @@ async function deleteLocationFromDB(locId) {
       return [32.9346, -97.2251]; // Default to Keller
     }
 
-    function populateTechnicianSelect() {
+    function populateTechnicianSelect(serviceTypeFilter = 'all') {
       const select = document.getElementById("drawingTechnician");
       if (!select) return;
       
       select.innerHTML = '<option value="">Select technician...</option>';
       
       // Filter technicians by current user's location if set
-      const displayTechnicians = currentUserLocationId 
+      let displayTechnicians = currentUserLocationId 
         ? technicians.filter(t => t.location_id === currentUserLocationId)
-        : technicians;
+        : [...technicians];
+      
+      // If a specific service type is selected (not 'all'), filter technicians by their assigned services
+      if (serviceTypeFilter !== 'all') {
+        displayTechnicians = displayTechnicians.filter(tech => {
+          // Check if technician has this service type assigned
+          return tech.services && tech.services.some(s => s.service_type === serviceTypeFilter);
+        });
+      }
       
       displayTechnicians.forEach(tech => {
         if (tech.is_active) {
@@ -2339,9 +3721,10 @@ async function deleteLocationFromDB(locId) {
               }).addTo(existingTerritoriesLayer);
             }
             
-            // Store technician ID on the layer so we can hide it when drawing
+            // Store technician ID and service type on the layer so we can hide/show by layer toggle
             if (layer) {
               layer.technicianId = territory.technician_id;
+              layer.serviceType = territory.service_type; // No default - only shows in All if not set
               
               // Add technician name label at the center of the territory
               const center = layer.getBounds().getCenter();
@@ -2369,6 +3752,7 @@ async function deleteLocationFromDB(locId) {
               }).addTo(existingTerritoriesLayer);
               
               labelMarker.technicianId = territory.technician_id;
+              labelMarker.serviceType = territory.service_type; // No default
             }
           });
           
@@ -2525,6 +3909,13 @@ async function deleteLocationFromDB(locId) {
     }
 
     function startDrawing() {
+      // Check if a specific service layer is selected (not "All")
+      const selectedLayerRadio = document.querySelector('input[name="territoryLayer"]:checked');
+      if (!selectedLayerRadio || selectedLayerRadio.value === 'all') {
+        alert("Please select a specific service layer (Chemical, Mowing, or Pest) to draw a territory. 'All' is for viewing only.");
+        return;
+      }
+      
       const technicianId = document.getElementById("drawingTechnician").value;
       if (!technicianId) {
         alert("Please select a technician first");
@@ -2701,14 +4092,22 @@ async function deleteLocationFromDB(locId) {
         });
         const radiusMiles = maxDistance * 69; // Convert degrees to miles (approximate)
 
+        // Get the currently selected layer (service type)
+        const selectedLayerRadio = document.querySelector('input[name="territoryLayer"]:checked');
+        let serviceType = 'chemical'; // Default
+        if (selectedLayerRadio && selectedLayerRadio.value !== 'all') {
+          serviceType = selectedLayerRadio.value;
+        }
+
         // Save to database
         const formData = new FormData();
         formData.append("technician_id", selectedTechnician.id);
-        formData.append("territory_name", `${selectedTechnician.name} Custom Territory`);
+        formData.append("territory_name", `${selectedTechnician.name} ${serviceType.charAt(0).toUpperCase() + serviceType.slice(1)} Territory`);
         formData.append("center_lat", centerLat);
         formData.append("center_lng", centerLng);
         formData.append("radius_miles", radiusMiles);
         formData.append("polygon_coords", JSON.stringify(currentDrawing));
+        formData.append("service_type", serviceType);
 
         const res = await fetch(`${API_BASE}/technician_territories/custom`, {
           method: "POST",
@@ -2731,7 +4130,7 @@ async function deleteLocationFromDB(locId) {
       }
     }
 
-    function resetForNextTechnician() {
+    async function resetForNextTechnician() {
       // Clear the current drawing
       drawingLayer.clearLayers();
       currentDrawing = null;
@@ -2747,12 +4146,42 @@ async function deleteLocationFromDB(locId) {
       selectedTechnician = null;
       // Reload existing territories to show the one we just saved
       existingTerritoriesLayer.clearLayers();
-      loadExistingTerritories();
+      await loadExistingTerritories();
+      
+      // Apply current layer filter to show/hide territories correctly
+      const selectedLayerRadio = document.querySelector('input[name="territoryLayer"]:checked');
+      if (selectedLayerRadio) {
+        switchTerritoryLayer(selectedLayerRadio.value);
+      }
       
       // Keep modal open - user can select another technician and draw again
     }
 
-    // ============ OFFICE WORKERS MANAGEMENT ============
+    function switchTerritoryLayer(selectedLayer) {
+      // Show/hide territories based on selected layer - only ONE layer visible at a time
+      existingTerritoriesLayer.eachLayer(layer => {
+        const layerServiceType = layer.serviceType; // No default
+        let show = false;
+        
+        if (selectedLayer === 'all') {
+          show = true;
+        } else {
+          show = layerServiceType === selectedLayer;
+        }
+        
+        // Check if layer has setStyle (polygons, circles) or use setOpacity (markers)
+        if (layer.setStyle) {
+          layer.setStyle({ opacity: show ? 1 : 0, fillOpacity: show ? 0.2 : 0 });
+        } else if (layer.setOpacity) {
+          layer.setOpacity(show ? 1 : 0);
+        }
+      });
+      
+      // Update technician dropdown to only show techs who offer this service
+      populateTechnicianSelect(selectedLayer);
+      
+      console.log(`Switched to territory layer: ${selectedLayer}`);
+    }
     let officeWorkers = [];
 
     async function loadOfficeWorkers() {
@@ -2943,6 +4372,7 @@ async function deleteLocationFromDB(locId) {
       document.getElementById("tab-locations").classList.remove("active");
       document.getElementById("tab-technicians").classList.add("active");
       document.getElementById("tab-office").classList.remove("active");
+      document.getElementById("tab-payments").classList.remove("active");
       loadLocations().then(() => loadTechnicians());
     });
 
@@ -2951,12 +4381,28 @@ async function deleteLocationFromDB(locId) {
       document.getElementById("locations").classList.remove("active");
       document.getElementById("technicians").classList.remove("active");
       document.getElementById("office").classList.add("active");
+      document.getElementById("payments").classList.remove("active");
       document.getElementById("tab-treatments").classList.remove("active");
       document.getElementById("tab-locations").classList.remove("active");
       document.getElementById("tab-technicians").classList.remove("active");
       document.getElementById("tab-office").classList.add("active");
+      document.getElementById("tab-payments").classList.remove("active");
       populateOfficeWorkerLocations();
       loadOfficeWorkers();
+    });
+
+    document.getElementById("tab-payments").addEventListener("click", () => {
+      document.getElementById("treatments").classList.remove("active");
+      document.getElementById("locations").classList.remove("active");
+      document.getElementById("technicians").classList.remove("active");
+      document.getElementById("office").classList.remove("active");
+      document.getElementById("payments").classList.add("active");
+      document.getElementById("tab-treatments").classList.remove("active");
+      document.getElementById("tab-locations").classList.remove("active");
+      document.getElementById("tab-technicians").classList.remove("active");
+      document.getElementById("tab-office").classList.remove("active");
+      document.getElementById("tab-payments").classList.add("active");
+      loadPaymentProcessors();
     });
 
     // Event listeners will be attached after page loads
@@ -3086,6 +4532,183 @@ async function deleteLocationFromDB(locId) {
       }
     }
 
+    async function populatePaymentLocations() {
+      const select = document.getElementById("paymentLocationFilter");
+      select.innerHTML = '<option value="">Select a location...</option>';
+      
+      try {
+        const res = await fetch(`${API_BASE}/locations`);
+        const data = await res.json();
+        const locations = data.locations || [];
+        
+        locations.forEach(loc => {
+          const option = document.createElement("option");
+          option.value = loc.id;
+          option.textContent = loc.name;
+          select.appendChild(option);
+        });
+      } catch (e) {
+        console.error("Load locations for payment settings error:", e);
+      }
+    }
+
+    // ============ PAYMENT PROCESSOR FUNCTIONS ============
+    function toggleProcessor(processor) {
+      const enabled = document.getElementById(`${processor}Enabled`).checked;
+      const configDiv = document.getElementById(`${processor}Config`);
+      configDiv.style.display = enabled ? 'block' : 'none';
+    }
+
+    async function loadPaymentProcessors() {
+      try {
+        const res = await fetch(`${API_BASE}/payment-processors`);
+        const data = await res.json();
+        
+        if (data.status === 'success') {
+          // Reset all fields
+          ['stripe', 'square', 'paypal'].forEach(proc => {
+            document.getElementById(`${proc}Enabled`).checked = false;
+            document.getElementById(`${proc}Config`).style.display = 'none';
+          });
+
+          // Load saved configurations
+          data.processors.forEach(proc => {
+            const checkbox = document.getElementById(`${proc.processor_type}Enabled`);
+            if (checkbox) {
+              checkbox.checked = proc.is_enabled;
+              document.getElementById(`${proc.processor_type}Config`).style.display = proc.is_enabled ? 'block' : 'none';
+              
+              // Load config values
+              const config = JSON.parse(proc.config_json || '{}');
+              if (proc.processor_type === 'stripe') {
+                document.getElementById('stripePublishableKey').value = config.publishable_key || '';
+                document.getElementById('stripeWebhookSecret').value = config.webhook_secret || '';
+                document.getElementById('stripeTestMode').checked = config.test_mode || false;
+              } else if (proc.processor_type === 'square') {
+                document.getElementById('squareAppId').value = config.app_id || '';
+                document.getElementById('squareLocationId').value = config.location_id || '';
+                document.getElementById('squareTestMode').checked = config.test_mode || false;
+              } else if (proc.processor_type === 'paypal') {
+                document.getElementById('paypalClientId').value = config.client_id || '';
+                document.getElementById('paypalMerchantId').value = config.merchant_id || '';
+                document.getElementById('paypalTestMode').checked = config.test_mode || false;
+              }
+            }
+          });
+
+          renderActivePaymentMethods(data.processors);
+        }
+      } catch (e) {
+        console.error('Load payment processors error:', e);
+      }
+    }
+
+    function renderActivePaymentMethods(processors) {
+      const container = document.getElementById('activePaymentMethods');
+      const active = processors.filter(p => p.is_enabled);
+      
+      if (active.length === 0) {
+        container.innerHTML = `
+          <div style="padding: 1rem; background: var(--bg-secondary); border-radius: 8px; color: var(--text-secondary); text-align: center;">
+            <i class="fas fa-credit-card"></i> No payment processors configured. Toggle a processor above to enable it.
+          </div>
+        `;
+        return;
+      }
+
+      const processorInfo = {
+        stripe: { name: 'Stripe', color: '#635BFF', icon: 'fa-stripe' },
+        square: { name: 'Square', color: '#00C853', icon: 'fa-square' },
+        paypal: { name: 'PayPal', color: '#003087', icon: 'fa-paypal' }
+      };
+
+      container.innerHTML = active.map(p => {
+        const info = processorInfo[p.processor_type];
+        const config = JSON.parse(p.config_json || '{}');
+        const mode = config.test_mode ? 'Test Mode' : 'Live Mode';
+        return `
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; background: white; border-radius: 8px; border: 1px solid var(--border-color);">
+            <div style="display: flex; align-items: center; gap: 0.75rem;">
+              <div style="width: 36px; height: 36px; background: ${info.color}; border-radius: 6px; display: flex; align-items: center; justify-content: center;">
+                <i class="fab ${info.icon}" style="color: white; font-size: 1.2rem;"></i>
+              </div>
+              <div>
+                <div style="font-weight: 600; color: var(--text-primary);">${info.name}</div>
+                <div style="font-size: 0.8rem; color: var(--text-secondary);">${mode}</div>
+              </div>
+            </div>
+            <span style="padding: 0.25rem 0.75rem; background: #dcfce7; color: #166a34a; border-radius: 999px; font-size: 0.8rem; font-weight: 500;">
+              <i class="fas fa-check"></i> Active
+            </span>
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function saveProcessorConfig(processor) {
+      const isEnabled = document.getElementById(`${processor}Enabled`).checked;
+      let config = {};
+
+      if (processor === 'stripe') {
+        config = {
+          publishable_key: document.getElementById('stripePublishableKey').value,
+          webhook_secret: document.getElementById('stripeWebhookSecret').value,
+          test_mode: document.getElementById('stripeTestMode').checked
+        };
+      } else if (processor === 'square') {
+        config = {
+          app_id: document.getElementById('squareAppId').value,
+          location_id: document.getElementById('squareLocationId').value,
+          test_mode: document.getElementById('squareTestMode').checked
+        };
+      } else if (processor === 'paypal') {
+        config = {
+          client_id: document.getElementById('paypalClientId').value,
+          merchant_id: document.getElementById('paypalMerchantId').value,
+          test_mode: document.getElementById('paypalTestMode').checked
+        };
+      }
+
+      // Get secret key if provided (for update)
+      const secretKeyInput = document.getElementById(`${processor === 'stripe' ? 'stripeSecretKey' : processor === 'square' ? 'squareAccessToken' : 'paypalClientSecret'}`);
+      const secretKey = secretKeyInput ? secretKeyInput.value : '';
+
+      try {
+        const formData = new FormData();
+        formData.append('processor_type', processor);
+        formData.append('is_enabled', isEnabled);
+        formData.append('config_json', JSON.stringify(config));
+        if (secretKey) {
+          formData.append('secret_key', secretKey);
+        }
+
+        const res = await fetch(`${API_BASE}/payment-processors`, {
+          method: 'POST',
+          body: formData
+        });
+
+        const data = await res.json();
+        if (data.status === 'success') {
+          alert(`${processor.charAt(0).toUpperCase() + processor.slice(1)} configuration saved successfully!`);
+          loadPaymentProcessors();
+          // Clear secret key field for security
+          if (secretKeyInput) secretKeyInput.value = '';
+        } else {
+          alert('Error: ' + (data.message || 'Failed to save configuration'));
+        }
+      } catch (e) {
+        console.error('Save processor config error:', e);
+        alert('Failed to save configuration');
+      }
+    }
+
+    function copyWebhookUrl() {
+      const webhookUrl = document.getElementById('webhookUrl');
+      webhookUrl.select();
+      document.execCommand('copy');
+      alert('Webhook URL copied to clipboard!');
+    }
+
     // ============ INIT ============
     loadAllData();
     loadLocations();
@@ -3093,6 +4716,68 @@ async function deleteLocationFromDB(locId) {
     populateOfficeWorkerLocations();
     loadOfficeWorkers();
     loadCurrentUser();
+    
+    // Reload data when user returns to this page (from routing or other tabs)
+    document.addEventListener('visibilitychange', async () => {
+      if (document.visibilityState === 'visible') {
+        console.log('Page became visible, reloading data...');
+        const locationFilter = document.getElementById("treatmentPlanLocationFilter");
+        if (locationFilter && locationFilter.value) {
+          await loadAllData();  // Load grass types first
+          await loadServices(); // Then render services (which will call renderAll)
+        }
+      }
+    });
   </script>
+  <!-- Edit Technician Modal -->
+  <div id="editTechnicianModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;">
+    <div style="background: white; border-radius: 8px; padding: 2rem; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+        <h3 style="margin: 0;"><i class="fas fa-user-edit"></i> Edit Technician</h3>
+        <button onclick="closeEditTechnicianModal()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer;">&times;</button>
+      </div>
+      
+      <div style="margin-bottom: 1rem;">
+        <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Name</label>
+        <input type="text" id="editTechName" class="form-input" style="width: 100%;" />
+      </div>
+      
+      <div style="margin-bottom: 1rem;">
+        <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Office Location</label>
+        <select id="editTechLocation" class="form-input" style="width: 100%;">
+          <option value="">Select location...</option>
+        </select>
+      </div>
+      
+      <div style="margin-bottom: 1rem;">
+        <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Profile Color</label>
+        <input type="color" id="editTechColor" class="form-input" style="width: 100%; height: 40px;" />
+      </div>
+      
+      <div style="margin-bottom: 1.5rem;">
+        <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Assigned Services</label>
+        <div id="editTechServicesContainer" style="display: flex; gap: 1.5rem; flex-wrap: wrap; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-primary);">
+          <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+            <input type="checkbox" id="editTechServiceChemical" value="chemical" class="edit-tech-service-checkbox" style="width: 18px; height: 18px; cursor: pointer;">
+            <span><i class="fas fa-flask" style="color: #16a34a;"></i> Chemical Lawn</span>
+          </label>
+          <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+            <input type="checkbox" id="editTechServiceMowing" value="mowing" class="edit-tech-service-checkbox" style="width: 18px; height: 18px; cursor: pointer;">
+            <span><i class="fas fa-cut" style="color: #2563eb;"></i> Mowing</span>
+          </label>
+          <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+            <input type="checkbox" id="editTechServicePest" value="pest" class="edit-tech-service-checkbox" style="width: 18px; height: 18px; cursor: pointer;">
+            <span><i class="fas fa-bug" style="color: #d97706;"></i> Pest Control</span>
+          </label>
+        </div>
+      </div>
+      
+      <div style="display: flex; gap: 1rem; justify-content: flex-end;">
+        <button onclick="closeEditTechnicianModal()" class="btn btn-secondary">Cancel</button>
+        <button onclick="saveEditTechnician()" class="btn btn-primary"><i class="fas fa-save"></i> Save Changes</button>
+      </div>
+    </div>
+  </div>
+
 </body>
 </html>

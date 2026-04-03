@@ -392,6 +392,23 @@
                 <button id="hideTerritoriesBtn" class="btn btn-secondary" style="background: var(--gray-500); color: white; display: none; padding: 0.75rem 1rem;">
                     <i class="fas fa-eye-slash"></i> Hide Territories
                 </button>
+                
+                <!-- Layer Filter (shown when territories are visible) -->
+                <div id="territoryLayerFilter" style="display: none; background: #f3f4f6; padding: 0.5rem 0.75rem; border-radius: 8px; border: 1px solid var(--gray-300);">
+                    <label style="font-size: 0.85rem; color: var(--gray-600); margin-right: 0.5rem;">Layer:</label>
+                    <label style="font-size: 0.8rem; margin-right: 0.75rem; cursor: pointer;">
+                        <input type="radio" name="routingTerritoryLayer" value="all" checked onchange="switchRoutingTerritoryLayer(this.value)" style="vertical-align: middle;"> All
+                    </label>
+                    <label style="font-size: 0.8rem; margin-right: 0.75rem; cursor: pointer;">
+                        <input type="radio" name="routingTerritoryLayer" value="chemical" onchange="switchRoutingTerritoryLayer(this.value)" style="vertical-align: middle;"> <i class="fas fa-flask" style="color: #16a34a;"></i> Chemical
+                    </label>
+                    <label style="font-size: 0.8rem; margin-right: 0.75rem; cursor: pointer;">
+                        <input type="radio" name="routingTerritoryLayer" value="mowing" onchange="switchRoutingTerritoryLayer(this.value)" style="vertical-align: middle;"> <i class="fas fa-cut" style="color: #2563eb;"></i> Mowing
+                    </label>
+                    <label style="font-size: 0.8rem; cursor: pointer;">
+                        <input type="radio" name="routingTerritoryLayer" value="pest" onchange="switchRoutingTerritoryLayer(this.value)" style="vertical-align: middle;"> <i class="fas fa-bug" style="color: #d97706;"></i> Pest
+                    </label>
+                </div>
                 <div style="margin-left: auto; display: flex; gap: 0.5rem; align-items: center;">
                     <span style="font-size: 0.9rem; color: var(--gray-600);">Status:</span>
                     <span id="dailyRoutesStatus" style="padding: 0.25rem 0.75rem; background: var(--gray-100); border-radius: 20px; font-size: 0.85rem; color: var(--gray-600);">Not Generated</span>
@@ -448,10 +465,12 @@
         let routeMarkers = [];
         let currentSchedule = null;
         let clusterData = null;
+        let territoryLayerGroup = null; // Layer group for territories
         let territoryMarkers = [];
         let technicianData = null;
         let dailyRoutesData = null; // Store routes for view route function
         let officeLocation = null;
+        let currentTerritoryLayer = 'all'; // Current layer filter
         
         // Initialize map first with default view, then update based on user location
         function initMap() {
@@ -686,8 +705,12 @@
         }
 
         function displayTerritories(territories) {
-            // Clear existing territory markers
-            territoryMarkers.forEach(marker => map.removeLayer(marker));
+            // Create layer group if not exists
+            if (!territoryLayerGroup) {
+                territoryLayerGroup = L.layerGroup().addTo(map);
+            } else {
+                territoryLayerGroup.clearLayers();
+            }
             territoryMarkers = [];
             
             territories.forEach(territory => {
@@ -706,12 +729,12 @@
                                 weight: 2,
                                 opacity: 0.4,
                                 dashArray: '5, 5'
-                            }).addTo(map);
+                            }).addTo(territoryLayerGroup);
                             
                             layer.bindPopup(`
                                 <div style="text-align: center;">
                                     <strong>${territory.technician_name}</strong><br>
-                                    <span style="color: ${territory.color_hex};">●</span> Custom Territory
+                                    <span style="color: ${territory.color_hex};">●</span> ${territory.service_type || 'chemical'} Territory
                                 </div>
                             `);
                         }
@@ -729,24 +752,56 @@
                         weight: 2,
                         opacity: 0.3,
                         fillOpacity: 0.1
-                    }).addTo(map);
+                    }).addTo(territoryLayerGroup);
                     
                     layer.bindPopup(`
                         <div style="text-align: center;">
                             <strong>${territory.technician_name}</strong><br>
                             <span style="color: ${territory.color_hex};">●</span> ${territory.territory_name}<br>
-                            <small>${territory.radius_miles} mile radius</small>
+                            <small>${territory.service_type || 'chemical'} | ${territory.radius_miles} mile radius</small>
                         </div>
                     `);
                 }
                 
+                // Store service type on layer for filtering
+                layer.serviceType = territory.service_type || 'chemical';
                 territoryMarkers.push(layer);
             });
+            
+            // Apply current layer filter
+            switchRoutingTerritoryLayer(currentTerritoryLayer);
         }
 
         function hideTerritories() {
-            territoryMarkers.forEach(marker => map.removeLayer(marker));
+            if (territoryLayerGroup) {
+                territoryLayerGroup.clearLayers();
+            }
             territoryMarkers = [];
+            document.getElementById('territoryLayerFilter').style.display = 'none';
+        }
+        
+        function switchRoutingTerritoryLayer(selectedLayer) {
+            currentTerritoryLayer = selectedLayer;
+            
+            if (!territoryLayerGroup) return;
+            
+            territoryLayerGroup.eachLayer(layer => {
+                const layerServiceType = layer.serviceType || 'chemical';
+                let show = false;
+                
+                if (selectedLayer === 'all') {
+                    show = true;
+                } else {
+                    show = layerServiceType === selectedLayer;
+                }
+                
+                // Show/hide using opacity
+                if (layer.setStyle) {
+                    layer.setStyle({ opacity: show ? 0.4 : 0, fillOpacity: show ? 0.15 : 0 });
+                }
+            });
+            
+            console.log(`Switched routing territory layer to: ${selectedLayer}`);
         }
 
         // Event listeners
@@ -754,12 +809,17 @@
             await loadTechnicianTerritories();
             document.getElementById('showTerritoriesBtn').style.display = 'none';
             document.getElementById('hideTerritoriesBtn').style.display = 'inline-block';
+            document.getElementById('territoryLayerFilter').style.display = 'inline-block';
         });
         
         document.getElementById('hideTerritoriesBtn').addEventListener('click', () => {
             hideTerritories();
             document.getElementById('showTerritoriesBtn').style.display = 'inline-block';
             document.getElementById('hideTerritoriesBtn').style.display = 'none';
+            document.getElementById('territoryLayerFilter').style.display = 'none';
+            // Reset to All
+            document.querySelector('input[name="routingTerritoryLayer"][value="all"]').checked = true;
+            currentTerritoryLayer = 'all';
         });
         
         // Auto-generate routes on page load
@@ -848,13 +908,22 @@
                                 </div>
                                 ${route.remaining_due > 0 ? `<div style="font-size: 0.85rem; color: #f59e0b; margin-bottom: 0.5rem;"><i class="fas fa-exclamation-triangle"></i> ${route.remaining_due} more due customers not assigned (capacity limit)</div>` : ''}
                                 <div style="font-size: 0.8rem; color: var(--gray-500);">
-                                    ${route.customers.map((c, i) => `
+                                    ${route.customers.map((c, i) => {
+                                        const serviceIcons = {
+                                            'chemical': '<i class="fas fa-flask" style="color: #16a34a;" title="Chemical"></i>',
+                                            'mowing': '<i class="fas fa-cut" style="color: #2563eb;" title="Mowing"></i>',
+                                            'pest': '<i class="fas fa-bug" style="color: #d97706;" title="Pest Control"></i>'
+                                        };
+                                        const icons = (c.services || ['chemical']).map(s => serviceIcons[s] || '').join(' ');
+                                        return `
                                         <div style="display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0;">
                                             <span style="background: ${route.technician_color || '#3b82f6'}; color: white; width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: bold;">${i + 1}</span>
                                             <span>${c.name}</span>
+                                            <span style="margin-left: 0.5rem; font-size: 0.75rem;">${icons}</span>
                                             <span style="margin-left: auto; color: var(--gray-400);">${c.sqft.toLocaleString()} sqft</span>
                                         </div>
-                                    `).join('')}
+                                        `;
+                                    }).join('')}
                                 </div>
                             `;
                         }
